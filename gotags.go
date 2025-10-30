@@ -136,11 +136,8 @@ var fset = token.NewFileSet()
 
 func gotags(inputs iter.Seq[string], output io.Writer, quiet bool) {
 	for inputFn := range inputs {
-		// Always emit the file header/footer even if the file defines no symbols (highly unusual,
-		// as there's normally at least a package clause).
 		fmt.Fprintf(output, "\x0C\x0A%s,0", inputFn)
 
-		// We're going to need a handle on the source text no matter what.
 		inputBytes, err := os.ReadFile(inputFn)
 		if err != nil {
 			if !quiet {
@@ -150,24 +147,16 @@ func gotags(inputs iter.Seq[string], output io.Writer, quiet bool) {
 		}
 		inputText := string(inputBytes)
 
-		// Attempt to parse the file (ParseFile executes fset.AddFile).  If the parse succeeds,
-		// generate info from the parse tree, otherwise fall back to a per-line regexp match a la
-		// etags.
 		f, err := parser.ParseFile(fset, inputFn, inputText, parser.SkipObjectResolution)
 		if err == nil {
 			semtags(inputFn, inputText, f, output)
 		} else {
-			if f != nil {
-				if !quiet {
-					log.Printf("Reverting to etags parsing for %s: %v", inputFn, err)
-				}
-				etags(inputText, output)
-			} else {
-				if !quiet {
-					log.Printf("Skipping %s: %v", inputFn, err)
-				}
+			if !quiet {
+				log.Printf("Reverting to etags parsing for %s: %v", inputFn, err)
 			}
+			etags(inputText, output)
 		}
+
 		fmt.Fprintf(output, "\x0A")
 	}
 }
@@ -227,7 +216,7 @@ var etagsRe = regexp.MustCompile(`^(?:((?:package|func|type|var|const)\s+[a-zA-Z
 
 func etags(inputText string, output io.Writer) {
 	lineno := 0
-	for l := range generateLines(strings.NewReader(inputText)) {
+	for _, l := range strings.Split(inputText, "\n") {
 		if m := etagsRe.FindStringSubmatch(l); m != nil {
 			fmt.Fprintf(output, "\x0A%s\x7F%d,", m[1], lineno)
 		}
