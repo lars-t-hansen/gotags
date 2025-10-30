@@ -1,5 +1,7 @@
+// SPDX-License-Identifier: MIT
+
 /*
-Gotags generates an etags-like tag file for Go source, but with better Go awareness.
+Gotags generates an etags-like tag file for Go source, but with better Go awareness than etags.
 
 Input file names are provided on the command line.  If the only input file name is given as "-" then
 the names of input files are read from standard input, one name per line.
@@ -11,8 +13,8 @@ Usage:
 The flags are:
 
 	-o output-filename
-	    Write output to output-filename rather than to TAGS.  If output-filename is "-" then write
-	    to standard output.
+	    Write output to output-filename rather than to TAGS.  If output-filename
+        is "-" then write to standard output.
 
 Tags are generated for all global names: packages, types, constants, functions, and variables,
 irrespective of the declaration syntax.  (Etags does not handle constants or variables, nor types
@@ -106,8 +108,6 @@ func main() {
 	if len(rest) == 1 && rest[0] == "-" {
 		inputs = func(yield func(string) bool) {
 			scanner := bufio.NewScanner(os.Stdin)
-			// TODO: This assumes one file per line, but in principle names could probably be
-			// space-separated?  But then what about paths with spaces in them?
 			for scanner.Scan() {
 				if !yield(scanner.Text()) {
 					break
@@ -130,14 +130,14 @@ func main() {
 		defer output.Close()
 	}
 
-	gotags(inputs, output)
+	gotags(inputs, output, false)
 }
 
 var (
 	fset = token.NewFileSet()
 )
 
-func gotags(inputs iter.Seq[string], output io.Writer) {
+func gotags(inputs iter.Seq[string], output io.Writer, quiet bool) {
 	for inputFn := range inputs {
 		// Always emit the file header/footer even if the file defines no symbols (highly unusual,
 		// as there's normally at least a package clause).
@@ -146,7 +146,9 @@ func gotags(inputs iter.Seq[string], output io.Writer) {
 		// We're going to need a handle on the source text no matter what.
 		inputBytes, err := os.ReadFile(inputFn)
 		if err != nil {
-			log.Printf("Skipping %s: %v", inputFn, err)
+			if !quiet {
+				log.Printf("Skipping %s: %v", inputFn, err)
+			}
 			continue
 		}
 		inputText := string(inputBytes)
@@ -159,10 +161,14 @@ func gotags(inputs iter.Seq[string], output io.Writer) {
 			semtags(inputFn, inputText, f, output)
 		} else {
 			if f != nil {
-				log.Printf("Reverting to etags parsing for %s: %v", inputFn, err)
+				if !quiet {
+					log.Printf("Reverting to etags parsing for %s: %v", inputFn, err)
+				}
 				etags(inputText, output)
 			} else {
-				log.Printf("Skipping %s: %v", inputFn, err)
+				if !quiet {
+					log.Printf("Skipping %s: %v", inputFn, err)
+				}
 			}
 		}
 		fmt.Fprintf(output, "\x0A")

@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+
+default:
+	@echo "Pick an explicit target"
+
+README.md: gotags.go Makefile
+	echo "# gotags - reliable etags-style tag information for Go" > README.md
+	echo >> README.md
+	go doc | awk '/^func / { exit } { print }' >> README.md
+
