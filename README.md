@@ -13,9 +13,9 @@ Usage:
 
 The flags are:
 
-    	-o output-filename
-    	    Write output to output-filename rather than to TAGS.  If output-filename
-            is "-" then write to standard output.
+    -o output-filename
+        Write output to output-filename rather than to TAGS.  If output-filename
+        is "-" then write to standard output.
 
 Tags are generated for all global names: packages, types, constants, functions,
 and variables, irrespective of the declaration syntax. (Etags does not handle

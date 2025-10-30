@@ -21,7 +21,7 @@ func TestSimple(t *testing.T) {
 	var out strings.Builder
 	gotags(slices.Values(testFiles), &out, true)
 	outLines := strings.Split(out.String(), "\n")
-	o := 0						// Line number
+	o := 0 // Line number
 
 	for _, testFile := range testFiles {
 		if len(outLines) < 2 || outLines[o] != "\x0C" || outLines[o+1] != fmt.Sprintf("%s,0", testFile) {
