@@ -2,7 +2,7 @@
 
 // TODO: test cases
 // - multiple input files
-// - read file names from iterator (really from stdin)
+// - read file names from iterator (really from stdin, need to factor)
 // - some file should trigger fallback to etags case
 
 package main
@@ -16,6 +16,12 @@ import (
 )
 
 func TestSimple(t *testing.T) {
+
+	// Each test file contains go code and each line that should give rise to a tag has a comment
+	// that starts with //D followed by a list of expected tag patterns for that line (with literal
+	// tabs if necessary) separated by |, eg "|var v1|var v1, v2|" for a var decl that introduces
+	// two names.
+
 	testFiles := []string{"testdata/t1.go"}
 
 	var out strings.Builder

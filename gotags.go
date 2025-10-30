@@ -32,7 +32,6 @@ functionality, such as compressed files.
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -113,14 +112,7 @@ Options:
 	var inputs iter.Seq[string]
 	rest := flag.Args()
 	if len(rest) == 1 && rest[0] == "-" {
-		inputs = func(yield func(string) bool) {
-			scanner := bufio.NewScanner(os.Stdin)
-			for scanner.Scan() {
-				if !yield(scanner.Text()) {
-					break
-				}
-			}
-		}
+		inputs = generateLines(os.Stdin)
 	} else {
 		inputs = slices.Values(rest)
 	}
@@ -234,10 +226,8 @@ var etagsRe = regexp.MustCompile(`^(?:((?:package|func|type|var|const)\s+[a-zA-Z
 // Note we have no file offsets.
 
 func etags(inputText string, output io.Writer) {
-	scanner := bufio.NewScanner(strings.NewReader(inputText))
 	lineno := 0
-	for scanner.Scan() {
-		l := scanner.Text()
+	for l := range generateLines(strings.NewReader(inputText)) {
 		if m := etagsRe.FindStringSubmatch(l); m != nil {
 			fmt.Fprintf(output, "\x0A%s\x7F%d,", m[1], lineno)
 		}
