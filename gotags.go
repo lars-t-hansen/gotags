@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
-Gotags generates an etags-like tag file for Go source, but with better Go awareness than etags.
+Gotags generates an etags-like tag file for Go source, with better Go awareness than etags.
 
 Input file names are provided on the command line.  If the only input file name is given as "-" then
 the names of input files are read from standard input, one name per line.
@@ -17,9 +17,9 @@ The flags are:
 	    is "-" then write to standard output.
 
 Tags are generated for all global names: packages, types, constants, functions, and variables,
-irrespective of the declaration syntax.  (Etags does not handle constants or variables, nor types
-defined inside type lists, nor functions or types with type parameters, and it can mistake local
-type declarations for global ones.)
+irrespective of the declaration syntax.  In contrast, etags does not handle constants or variables,
+nor types defined inside type lists, nor functions or types with type parameters, and it can mistake
+local type declarations for global ones.
 
 For full functionality, gotags requires each input file to be syntactically well-formed in the
 sense of "go/parser".  If a file cannot be parsed, gotags prints a warning and falls back to
@@ -47,9 +47,7 @@ import (
 	"strings"
 )
 
-var (
-	outname = flag.String("o", "TAGS", "`Filename` of output file, '-' for stdout")
-)
+var outname = flag.String("o", "TAGS", "`Filename` of output file, \"-\" for stdout")
 
 // Output format.
 //
@@ -93,12 +91,21 @@ var (
 // TODO: Ideally we should include right context in the pattern where that is sensible but we have
 // to be careful.  The pattern must match the use.  For inferred type arguments, a call will not
 // include the type argument list, so a generic function cannot be defined with the pattern "name[",
-// since uses will be of the form "name(".  It's actually sort of interesting that a pattern like
-// "func main" works, since "func" is not at the use site.
+// since uses may be of the form "name(".
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s: %s [options] filename ...\n", os.Args[0], os.Args[0])
+		fmt.Fprintf(
+			flag.CommandLine.Output(), `Usage of %s:
+
+  %s [options] input-filename ...
+
+where input-filename can be "-" to denote that filenames will be read from stdin.
+
+Options:
+`,
+			os.Args[0],
+			os.Args[0])
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -133,9 +140,7 @@ func main() {
 	gotags(inputs, output, false)
 }
 
-var (
-	fset = token.NewFileSet()
-)
+var fset = token.NewFileSet()
 
 func gotags(inputs iter.Seq[string], output io.Writer, quiet bool) {
 	for inputFn := range inputs {
@@ -183,19 +188,12 @@ func semtags(inputFn, inputText string, f *ast.File, output io.Writer) {
 			continue
 		}
 		if item, ok := d.(*ast.GenDecl); ok {
-			if item.Tok != token.TYPE && item.Tok != token.VAR && item.Tok != token.CONST {
-				continue
-			}
-			// It looks like Emacs will (a) find the ident under the point for M-. and then (b) find a pattern
-			// that contains the ident and then (c) attempt to match the pattern against the text around the point,
-			// but with the constraint that the pattern must match the text at the start of a line.  Therefore,
-			// in lists we must extract the left context to the start of the line.  That is probably *also* true
-			// in all other cases but there we don't see it yet.
-			if item.Tok == token.TYPE {
+			switch item.Tok {
+			case token.TYPE:
 				for _, spec := range item.Specs {
 					makeTag(inputText, spec.(*ast.TypeSpec).Name, output)
 				}
-			} else {
+			case token.VAR, token.CONST:
 				for _, spec := range item.Specs {
 					vs := spec.(*ast.ValueSpec)
 					for _, name := range vs.Names {
@@ -206,6 +204,11 @@ func semtags(inputFn, inputText string, f *ast.File, output io.Writer) {
 		}
 	}
 }
+
+// It looks like Emacs will (a) find the ident under the point for M-. and then (b) find a pattern
+// that contains the ident and then (c) attempt to match the pattern against the text around the tag
+// location, but with the constraint that the pattern must match the text at the start of a line.
+// Therefore, makeTag must extract the left context all the way to the start of the line.
 
 func makeTag(inputText string, name *ast.Ident, output io.Writer) {
 	pos := name.NamePos
