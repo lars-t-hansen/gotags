@@ -49,8 +49,6 @@ var (
 	outname = flag.String("o", "TAGS", "`Filename` of output file, '-' for stdout")
 )
 
-var x, y int
-
 // Output format.
 //
 // The full tag file syntax is described by etc/ETAGS.EBNF in the Emacs sources.  Gotags generates a
@@ -97,8 +95,6 @@ var x, y int
 // "func main" works, since "func" is not at the use site.
 
 func main() {
-	_ = x
-	_ = y
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s: %s [options] filename ...\n", os.Args[0], os.Args[0])
 		flag.PrintDefaults()
@@ -174,19 +170,14 @@ func gotags(inputs iter.Seq[string], output io.Writer) {
 }
 
 func semtags(inputFn, inputText string, f *ast.File, output io.Writer) {
-	keyworded(f.Package, inputText, output)
+	makeTag(inputText, f.Name, output)
 	for _, d := range f.Decls {
 		if fd, ok := d.(*ast.FuncDecl); ok {
-			keyworded(fd.Pos(), inputText, output)
+			makeTag(inputText, fd.Name, output)
 			continue
 		}
 		if item, ok := d.(*ast.GenDecl); ok {
 			if item.Tok != token.TYPE && item.Tok != token.VAR && item.Tok != token.CONST {
-				continue
-			}
-			// There's a bug here: Consider 'var x, y int', also const.
-			if !item.Lparen.IsValid() {
-				keyworded(item.TokPos, inputText, output)
 				continue
 			}
 			// It looks like Emacs will (a) find the ident under the point for M-. and then (b) find a pattern
@@ -196,13 +187,13 @@ func semtags(inputFn, inputText string, f *ast.File, output io.Writer) {
 			// in all other cases but there we don't see it yet.
 			if item.Tok == token.TYPE {
 				for _, spec := range item.Specs {
-					makeTag(inputText, spec.(*ast.TypeSpec).Name.Name, spec.Pos(), output)
+					makeTag(inputText, spec.(*ast.TypeSpec).Name, output)
 				}
 			} else {
 				for _, spec := range item.Specs {
 					vs := spec.(*ast.ValueSpec)
 					for _, name := range vs.Names {
-						makeTag(inputText, name.Name, name.NamePos, output)
+						makeTag(inputText, name, output)
 					}
 				}
 			}
@@ -210,20 +201,12 @@ func semtags(inputFn, inputText string, f *ast.File, output io.Writer) {
 	}
 }
 
-var kwdRe = regexp.MustCompile(`^((?:package|func|type|var|const)\s+[a-zA-Z0-9_]+)`)
-
-func keyworded(pos token.Pos, inputText string, output io.Writer) {
-	offs := fset.File(pos).Offset(pos)
-	if m := kwdRe.FindStringSubmatch(inputText[offs:]); m != nil {
-		makeTag(inputText, m[1], pos, output)
-	}
-}
-
-func makeTag(inputText, match string, pos token.Pos, output io.Writer) {
+func makeTag(inputText string, name *ast.Ident, output io.Writer) {
+	pos := name.NamePos
 	tf := fset.File(pos)
 	offs := tf.Offset(pos)
 	line := tf.Line(pos) - 1
-	end := offs + len(match)
+	end := offs + len(name.Name)
 	for offs > 0 && inputText[offs-1] != '\n' {
 		offs--
 	}
