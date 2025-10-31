@@ -48,6 +48,46 @@ import (
 
 var outname = flag.String("o", "TAGS", "`Filename` of output file, \"-\" for stdout")
 
+func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(
+			flag.CommandLine.Output(), `Usage of %s:
+
+  %s [options] input-filename ...
+
+where input-filename can be "-" to denote that filenames will be read from stdin.
+
+Options:
+`,
+			os.Args[0],
+			os.Args[0])
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	var inputs iter.Seq[string]
+	rest := flag.Args()
+	if len(rest) == 1 && rest[0] == "-" {
+		inputs = generateLines(os.Stdin)
+	} else {
+		inputs = slices.Values(rest)
+	}
+
+	var output *os.File
+	if *outname == "-" {
+		output = os.Stdout
+	} else {
+		var err error
+		output, err = os.Create(*outname)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer output.Close()
+	}
+
+	gotags(inputs, output, false)
+}
+
 // Output format.
 //
 // The full tag file syntax is described by etc/ETAGS.EBNF in the Emacs sources.  Gotags generates a
@@ -91,46 +131,6 @@ var outname = flag.String("o", "TAGS", "`Filename` of output file, \"-\" for std
 // to be careful.  The pattern must match the use.  For inferred type arguments, a call will not
 // include the type argument list, so a generic function cannot be defined with the pattern "name[",
 // since uses may be of the form "name(".
-
-func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(
-			flag.CommandLine.Output(), `Usage of %s:
-
-  %s [options] input-filename ...
-
-where input-filename can be "-" to denote that filenames will be read from stdin.
-
-Options:
-`,
-			os.Args[0],
-			os.Args[0])
-		flag.PrintDefaults()
-	}
-	flag.Parse()
-
-	var inputs iter.Seq[string]
-	rest := flag.Args()
-	if len(rest) == 1 && rest[0] == "-" {
-		inputs = generateLines(os.Stdin)
-	} else {
-		inputs = slices.Values(rest)
-	}
-
-	var output *os.File
-	if *outname == "-" {
-		output = os.Stdout
-	} else {
-		var err error
-		output, err = os.Create(*outname)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer output.Close()
-	}
-
-	gotags(inputs, output, false)
-}
 
 var fset = token.NewFileSet()
 
@@ -203,12 +203,13 @@ func makeTag(inputText string, name *ast.Ident, output io.Writer) {
 	fmt.Fprintf(output, "\x0A%s\x7F%d,%d", inputText[offs:end], line, offs)
 }
 
-// This regexp is not actually etags-equivalent.  It requires the keyword to start in column 0,
+// This regexp is not entirely etags-equivalent.  It requires the keyword to start in column 0,
 // which is more limiting, but acceptable because that follows standard Go formatting for globals.
 // On the positive side it also includes var/const definitions found in column 0, won't typically
-// include types defined inside functions, and handles type parameters.  It still won't find
-// var/const/type definitions inside lists, but that's why this is a fallback from the full parser.
-// Like etags, it will be confused by code inside multi-line strings.
+// include types defined inside functions, and it handles type parameters.
+//
+// Like etags, however, it won't find var/const/type definitions inside lists or subsequent
+// var/const in a single definition, and it will be confused by code inside multi-line strings.
 
 var etagsRe = regexp.MustCompile(`^(?:((?:package|func|type|var|const)\s+[a-zA-Z0-9_]+))`)
 
