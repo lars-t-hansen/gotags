@@ -200,7 +200,7 @@ const identCharSet = `(?:\pL|\pN)`
 // Like etags, however, it won't find var/const/type definitions inside lists or subsequent
 // var/const in a single definition, and it will be confused by code inside multi-line strings.
 
-var etagsRe = regexp.MustCompile(`^(?:((?:package|func|type|var|const)\s+(` + identCharSet + `+)))`)
+var etagsRe = regexp.MustCompile(`^(?:((?:package|func(?:\s*\([^)]+\))?|type|var|const)\s+(` + identCharSet + `+)))`)
 
 // Note we have no file offsets.  We could fix that.
 
