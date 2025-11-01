@@ -6,6 +6,9 @@ Gotags generates an etags-like tag file for Go source, with better Go awareness 
 Input file names are provided on the command line.  If the only input file name is given as "-" then
 the names of input files are read from standard input, one name per line.
 
+Input files with extension other than .go are processed by the native etags into the specified output
+file.
+
 Usage:
 
 	gotags [flags] input-filename ...
@@ -16,18 +19,24 @@ The flags are:
 	    Write output to output-filename rather than to TAGS.  If output-filename
 	    is "-" then write to standard output.
 
-Tags are generated for all global names: packages, types, constants, functions, and variables,
+	-etags pathname
+		The name of the native etags command if not /usr/bin/etags, or specify
+		the empty string to disable the use of native etags for non-Go files.
+
+Tags are generated for all Go global names: packages, types, constants, functions, and variables,
 irrespective of the declaration syntax.  In contrast, etags does not handle constants or variables,
 nor types defined inside type lists, nor functions or types with type parameters, and it can mistake
 local type declarations for global ones.
 
-For full functionality, gotags requires each input file to be syntactically well-formed in the
-sense of "go/parser".  If a file cannot be parsed, gotags prints a warning and falls back to
-etags-style parsing.
+For full functionality, gotags requires each Go input file to be syntactically well-formed in the
+sense of "go/parser".  If a .go file cannot be parsed, gotags prints a warning and falls back to
+its own etags-style parsing.
 
-Input file names are emitted verbatim in the output, there's no resolution of relative file names
-wrt the location of the output file as in etags.  Nor is there support for other exotic etags
+Input file names are emitted verbatim in the output, gotags has no resolution of relative file names
+wrt the location of the output file as in etags, nor has it support for other exotic etags
 functionality, such as compressed files.
+
+Files that are passed to the native etags are processed entirely according to etags's semantics.
 */
 package main
 
@@ -41,12 +50,18 @@ import (
 	"iter"
 	"log"
 	"os"
+	"os/exec"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
 )
 
-var outname = flag.String("o", "TAGS", "`Filename` of output file, \"-\" for stdout")
+var (
+	outname            = flag.String("o", "TAGS", "`Filename` of output file, \"-\" for stdout")
+	systemEtagsCommand = flag.String("etags", "/usr/bin/etags", "`Path` of the native etags, \"\" to disable")
+	verbose            = flag.Bool("v", false, "Verbose (for debugging)")
+)
 
 func main() {
 	flag.Usage = func() {
@@ -88,7 +103,7 @@ Options:
 	gotags(inputs, output, false)
 }
 
-// Output format.
+// Format for gotags-generated output.
 //
 // The full tag file syntax and a fair bit of its semantics are described by etc/ETAGS.EBNF in the
 // Emacs sources.  Gotags generates a file that does not use "include" sections or file properties,
@@ -101,7 +116,7 @@ Options:
 //  tagdef     ::= LF pattern DEL tagname SOH lineno "," offset?
 //  pattern    ::= pattern-byte+
 //  tagname    ::= ident-char+
-//  lineno     ::= unsigned, zero-based
+//  lineno     ::= unsigned, one-based
 //  offset     ::= unsigned, zero-based
 //  unsigned   ::= [0-9]+
 //  SOH        ::= 0x01
@@ -124,7 +139,12 @@ Options:
 var fset = token.NewFileSet()
 
 func gotags(inputs iter.Seq[string], output io.Writer, quiet bool) {
+	unhandledFiles := make([]string, 0)
 	for inputFn := range inputs {
+		if path.Ext(inputFn) != ".go" {
+			unhandledFiles = append(unhandledFiles, inputFn)
+			continue
+		}
 		fmt.Fprintf(output, "\x0C\x0A%s,0", inputFn)
 
 		inputBytes, err := os.ReadFile(inputFn)
@@ -143,14 +163,20 @@ func gotags(inputs iter.Seq[string], output io.Writer, quiet bool) {
 			if !quiet {
 				log.Printf("Reverting to etags parsing for %s: %v", inputFn, err)
 			}
-			etags(inputText, output)
+			builtinEtags(inputFn, inputText, output)
 		}
 
 		fmt.Fprintf(output, "\x0A")
 	}
+	if len(unhandledFiles) > 0 && *systemEtagsCommand != "" {
+		systemEtags(unhandledFiles, output)
+	}
 }
 
 func semtags(inputFn, inputText string, f *ast.File, output io.Writer) {
+	if *verbose {
+		log.Printf("Gotags: %s", inputFn)
+	}
 	makeTag(inputText, f.Name, output)
 	for _, d := range f.Decls {
 		if fd, ok := d.(*ast.FuncDecl); ok {
@@ -179,7 +205,7 @@ func makeTag(inputText string, name *ast.Ident, output io.Writer) {
 	pos := name.NamePos
 	tf := fset.File(pos)
 	offs := tf.Offset(pos)
-	line := tf.Line(pos) - 1
+	line := tf.Line(pos)
 	end := offs + len(name.Name)
 	for offs > 0 && inputText[offs-1] != '\n' {
 		offs--
@@ -204,12 +230,41 @@ var etagsRe = regexp.MustCompile(`^(?:((?:package|func(?:\s*\([^)]+\))?|type|var
 
 // Note we have no file offsets.  We could fix that.
 
-func etags(inputText string, output io.Writer) {
+func builtinEtags(inputFn, inputText string, output io.Writer) {
+	if *verbose {
+		log.Printf("Builtin etags: %s", inputFn)
+	}
 	lineno := 0
 	for _, l := range strings.Split(inputText, "\n") {
 		if m := etagsRe.FindStringSubmatch(l); m != nil {
-			fmt.Fprintf(output, "\x0A%s\x7F%s\x01%d,", m[1], m[2], lineno)
+			fmt.Fprintf(output, "\x0A%s\x7F%s\x01%d,", m[1], m[2], lineno+1)
 		}
 		lineno++
+	}
+}
+
+func systemEtags(names []string, output io.Writer) {
+	if *verbose {
+		for _, inputFn := range names {
+			log.Printf("System etags: %s", inputFn)
+		}
+	}
+	cmd := exec.Command(*systemEtagsCommand, "-o", "-", "-")
+	cmd.Stdin = strings.NewReader(strings.Join(names, "\n"))
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	errText := stderr.String()
+	if errText != "" {
+		for _, line := range strings.Split(stderr.String(), "\n") {
+			log.Print(line)
+		}
+	}
+	fmt.Fprint(output, stdout.String())
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
+			os.Exit(exitErr.ExitCode())
+		}
 	}
 }

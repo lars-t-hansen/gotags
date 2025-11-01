@@ -1,7 +1,7 @@
 // This is not actually well-formed Go (there's a syntax error near the end).  Do not change the
 // next comment line.
 
-//etags
+//builtin-etags
 
 package Pack //D |package Pack|
 

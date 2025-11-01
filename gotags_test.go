@@ -12,8 +12,15 @@ import (
 )
 
 var (
-	idAtEnd = regexp.MustCompile(`(` + identCharSet + `+)$`)
-	commaAtEnd = regexp.MustCompile(`(,\s*)$`)
+	idAtEnd        = regexp.MustCompile(`(` + identCharSet + `+)$`)
+	commaAtEnd     = regexp.MustCompile(`(,\s*)$`)
+	notInNameAtEnd = regexp.MustCompile(`([\t\f\r (),;=]*)$`)
+)
+
+const (
+	mGotags = iota
+	mBuiltinEtags
+	mNativeEtags
 )
 
 func TestTagging(t *testing.T) {
@@ -25,9 +32,9 @@ func TestTagging(t *testing.T) {
 	// identifiers.
 	//
 	// The default assumption is that a file is well-formed Go, but it can switch modes by using a
-	// "//etags" line.
+	// "//builtin-etags" line or a "//native-etags" line.
 
-	testFiles := []string{"testdata/t1.go", "testdata/t2.go"}
+	testFiles := []string{"testdata/t1.go", "testdata/t2.go", "testdata/t3.c"}
 
 	var out strings.Builder
 	gotags(slices.Values(testFiles), &out, true)
@@ -35,8 +42,10 @@ func TestTagging(t *testing.T) {
 	o := 0 // Line number
 
 	for fileNo, testFile := range testFiles {
-		isGo := true
-		if len(outLines) < 2 || outLines[o] != "\x0C" || outLines[o+1] != fmt.Sprintf("%s,0", testFile) {
+		var mode int = mGotags
+		// Since we may run the system etags for some inputs, we can't count on the output byte size
+		// being zero always.
+		if len(outLines) < 2 || outLines[o] != "\x0C" || !strings.HasPrefix(outLines[o+1], testFile+",") {
 			t.Fatalf("%s: o=%d: Expected header in output", testFile, o)
 		}
 		o += 2
@@ -50,8 +59,10 @@ func TestTagging(t *testing.T) {
 		ix := 0 // Byte offset of line start
 
 		for i < len(inLines) {
-			if strings.HasPrefix(inLines[i], "//etags") {
-				isGo = false
+			if strings.HasPrefix(inLines[i], "//builtin-etags") {
+				mode = mBuiltinEtags
+			} else if strings.HasPrefix(inLines[i], "//native-etags") {
+				mode = mNativeEtags
 			} else if _, after, found := strings.Cut(inLines[i], "//D "); found {
 				patterns := strings.Split(after, "|")
 				if len(patterns) < 3 {
@@ -60,6 +71,9 @@ func TestTagging(t *testing.T) {
 				patterns = patterns[1 : len(patterns)-1]
 				for _, pattern := range patterns {
 					srch := pattern
+					if m := notInNameAtEnd.FindStringSubmatch(srch); m != nil {
+						srch = srch[:len(srch)-len(m[1])]
+					}
 					tagnames := make([]string, 0)
 					for {
 						m := idAtEnd.FindStringSubmatch(srch)
@@ -81,10 +95,14 @@ func TestTagging(t *testing.T) {
 						got := outLines[o]
 						o++
 						var expect string
-						if isGo {
-							expect = fmt.Sprintf("%s\x7F%s\x01%d,%d", pattern, tagname, i, ix)
-						} else {
-							expect = fmt.Sprintf("%s\x7F%s\x01%d,", pattern, tagname, i)
+						lineno := i + 1
+						switch mode {
+						case mGotags:
+							expect = fmt.Sprintf("%s\x7F%s\x01%d,%d", pattern, tagname, lineno, ix)
+						case mBuiltinEtags:
+							expect = fmt.Sprintf("%s\x7F%s\x01%d,", pattern, tagname, lineno)
+						case mNativeEtags:
+							expect = fmt.Sprintf("%s\x7F%d,%d", pattern, lineno, ix)
 						}
 						if got != expect {
 							t.Fatalf("%s: i=%d: Got %s but expected %s\n", testFile, i, got, expect)
