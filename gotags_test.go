@@ -16,9 +16,9 @@ var (
 	commaAtEnd = regexp.MustCompile(`(,\s*)$`)
 )
 
-func TestSimple(t *testing.T) {
+func TestTagging(t *testing.T) {
 
-	// Each test file contains go code and each line that should give rise to a tag has a comment
+	// Each test file contains Go code and each line that should give rise to a tag has a comment
 	// that starts with //D followed by a list of expected tag patterns for that line (with literal
 	// tabs if necessary) separated by |, eg "|var v1|var v1, v2|" for a var decl that introduces
 	// two names.  The tag names extracted from a pattern are the rightmost comma-separated

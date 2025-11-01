@@ -30,5 +30,4 @@ func F2[T any](x int) { //D |func F2|
 	type lt1 = int
 }
 
-// Indented to make sure it doesn't turn into a tag
-  func bad() { ++x }
+func bad() { ++x } //D |func bad|
