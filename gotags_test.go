@@ -2,17 +2,22 @@
 
 // TODO: test cases
 // - multiple input files
-// - read file names from iterator (really from stdin, need to factor)
-// - some file should trigger fallback to etags case
+// - some file should trigger fallback to etags case, needs a harness
 
 package main
 
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
+)
+
+var (
+	idAtEnd = regexp.MustCompile(`(` + identCharSet + `+)$`)
+	commaAtEnd = regexp.MustCompile(`(,\s*)$`)
 )
 
 func TestSimple(t *testing.T) {
@@ -20,7 +25,8 @@ func TestSimple(t *testing.T) {
 	// Each test file contains go code and each line that should give rise to a tag has a comment
 	// that starts with //D followed by a list of expected tag patterns for that line (with literal
 	// tabs if necessary) separated by |, eg "|var v1|var v1, v2|" for a var decl that introduces
-	// two names.
+	// two names.  The tag names extracted from a pattern are the rightmost comma-separated
+	// identifiers.
 
 	testFiles := []string{"testdata/t1.go"}
 
@@ -50,15 +56,32 @@ func TestSimple(t *testing.T) {
 					t.Fatalf("%s: i=%d: Bad test case: %s", testFile, i, inLines[i])
 				}
 				patterns = patterns[1 : len(patterns)-1]
-				for _, p := range patterns {
-					if o == len(outLines) {
-						t.Fatalf("%s: i=%d: Exhausted output on test case %s", testFile, i, inLines[i])
+				for _, pattern := range patterns {
+					srch := pattern
+					tagnames := make([]string, 0)
+					for {
+						m := idAtEnd.FindStringSubmatch(srch)
+						if m == nil {
+							t.Fatalf("%s: i=%d: Bad test case: %s", testFile, i, inLines[i])
+						}
+						tagnames = append(tagnames, m[1])
+						srch = srch[:len(srch)-len(m[1:1])]
+						m = commaAtEnd.FindStringSubmatch(srch)
+						if m == nil {
+							break
+						}
+						srch = srch[:len(srch)-len(m[1:1])]
 					}
-					got := outLines[o]
-					o++
-					expect := fmt.Sprintf("%s\x7F%d,%d", p, i, ix)
-					if got != expect {
-						t.Fatalf("%s: i=%d: Got %s but expected %s\n", testFile, i, got, expect)
+					for _, tagname := range tagnames {
+						if o == len(outLines) {
+							t.Fatalf("%s: i=%d: Exhausted output on test case %s", testFile, i, inLines[i])
+						}
+						got := outLines[o]
+						o++
+						expect := fmt.Sprintf("%s\x7F%s\x01%d,%d", pattern, tagname, i, ix)
+						if got != expect {
+							t.Fatalf("%s: i=%d: Got %s but expected %s\n", testFile, i, got, expect)
+						}
 					}
 				}
 			}

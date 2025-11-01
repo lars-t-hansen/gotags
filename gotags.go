@@ -90,16 +90,21 @@ Options:
 
 // Output format.
 //
-// The full tag file syntax is described by etc/ETAGS.EBNF in the Emacs sources.  Gotags generates a
-// file that does not use include sections, implicit tag names or file properties.  The simplified
-// output grammar is:
+// The full tag file syntax and a fair bit of its semantics are described by etc/ETAGS.EBNF in the
+// Emacs sources.  Gotags generates a file that does not use "include" sections or file properties,
+// always has explicit tag names, always has "0" for the size of the tagsection, and always emits
+// line numbers.  The simplified output grammar is:
 //
 //  tagfile    ::= tagsection*
 //  tagsection ::= FF LF filename "," "0" tagdef* LF
 //  filename   ::= filename-byte+
-//  tagdef     ::= LF pattern DEL unsigned "," unsigned?
+//  tagdef     ::= LF pattern DEL tagname SOH lineno "," offset?
 //  pattern    ::= pattern-byte+
+//  tagname    ::= ident-char+
+//  lineno     ::= unsigned, zero-based
+//  offset     ::= unsigned, zero-based
 //  unsigned   ::= [0-9]+
+//  SOH        ::= 0x01
 //  FF         ::= 0x0C
 //  LF         ::= 0x0A
 //  DEL        ::= 0x7F
@@ -108,29 +113,13 @@ Options:
 // encode a valid source character for Go.  It's unclear to me if Emacs does only 8-bit ASCII or can
 // handle UTF8 here.
 //
+// An ident-byte is any byte that can be part of a Go identifier.
+//
 // A filename-byte is any byte value that is valid in a file name on the operating system in
 // question, but not including "," or LF.
 //
-// In the tagdef, the unsigned values are zero-based line number and file offset for the start of
-// the tag.  The original grammar allows for one or the other to be omitted.  gotags will never omit
-// the line number, but may omit the file offset; Emacs seems to cope with that.
-//
-// The pattern includes the keyword that introduced it and all other text to the left of it from the
-// start of the line: "func main" is usually the pattern for the main function, but should
-// whitespace precede the "func" it is also included, as is additional whitespace between the two
-// tokens.  In declaration lists for type, var, and const, the pattern is therefore normally the
-// name and the whitespace preceding it.  And if there are multiple var or const names on a single
-// line, the tags for the second and subsequent names will have the same offset and line number as
-// the first, and their patterns will include all the preceding names too (being part of their
-// literal left context).  Emacs seems to handle this fine.
-//
-// Note that etags would emit "func main(" where here we emit only "func main", but Emacs seems to
-// cope with that.
-//
-// TODO: Ideally we should include right context in the pattern where that is sensible but we have
-// to be careful.  The pattern must match the use.  For inferred type arguments, a call will not
-// include the type argument list, so a generic function cannot be defined with the pattern "name[",
-// since uses may be of the form "name(".
+// Per the standard semantics, as we do not use implicit tags the pattern always ends with the
+// tagname.
 
 var fset = token.NewFileSet()
 
@@ -186,11 +175,6 @@ func semtags(inputFn, inputText string, f *ast.File, output io.Writer) {
 	}
 }
 
-// It looks like Emacs will (a) find the ident under the point for M-. and then (b) find a pattern
-// that contains the ident and then (c) attempt to match the pattern against the text around the tag
-// location, but with the constraint that the pattern must match the text at the start of a line.
-// Therefore, makeTag must extract the left context all the way to the start of the line.
-
 func makeTag(inputText string, name *ast.Ident, output io.Writer) {
 	pos := name.NamePos
 	tf := fset.File(pos)
@@ -200,26 +184,31 @@ func makeTag(inputText string, name *ast.Ident, output io.Writer) {
 	for offs > 0 && inputText[offs-1] != '\n' {
 		offs--
 	}
-	fmt.Fprintf(output, "\x0A%s\x7F%d,%d", inputText[offs:end], line, offs)
+	fmt.Fprintf(output, "\x0A%s\x7F%s\x01%d,%d", inputText[offs:end], name.Name, line, offs)
 }
 
-// This regexp is not entirely etags-equivalent.  It requires the keyword to start in column 0,
-// which is more limiting, but acceptable because that follows standard Go formatting for globals.
-// On the positive side it also includes var/const definitions found in column 0, won't typically
-// include types defined inside functions, and it handles type parameters.
+// IdentCharSet is also used by the testing code.  The intent here is to match Go's syntax though
+// without distinguishing between the initial and subsequent characters.
+
+const identCharSet = `(?:\pL|\pN)`
+
+// EtagsRe is not entirely etags-equivalent.  It requires the keyword to start in column 0, which is
+// more limiting, but acceptable because that follows standard Go formatting for globals.  On the
+// positive side it also includes var/const definitions found in column 0, won't typically include
+// types defined inside functions, and it handles type parameters.
 //
 // Like etags, however, it won't find var/const/type definitions inside lists or subsequent
 // var/const in a single definition, and it will be confused by code inside multi-line strings.
 
-var etagsRe = regexp.MustCompile(`^(?:((?:package|func|type|var|const)\s+[a-zA-Z0-9_]+))`)
+var etagsRe = regexp.MustCompile(`^(?:((?:package|func|type|var|const)\s+(` + identCharSet + `+)))`)
 
-// Note we have no file offsets.
+// Note we have no file offsets.  We could fix that.
 
 func etags(inputText string, output io.Writer) {
 	lineno := 0
 	for _, l := range strings.Split(inputText, "\n") {
 		if m := etagsRe.FindStringSubmatch(l); m != nil {
-			fmt.Fprintf(output, "\x0A%s\x7F%d,", m[1], lineno)
+			fmt.Fprintf(output, "\x0A%s\x7F%s\x01%d,", m[1], m[2], lineno)
 		}
 		lineno++
 	}
