@@ -37,7 +37,7 @@ func TestTagging(t *testing.T) {
 	testFiles := []string{"testdata/t1.go", "testdata/t2.go", "testdata/t3.c"}
 
 	var out strings.Builder
-	gotags(slices.Values(testFiles), &out, true)
+	computeTags(slices.Values(testFiles), &out, true)
 	outLines := strings.Split(out.String(), "\n")
 	o := 0 // Line number
 

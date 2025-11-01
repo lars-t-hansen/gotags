@@ -100,10 +100,47 @@ Options:
 		defer output.Close()
 	}
 
-	gotags(inputs, output, false)
+	computeTags(inputs, output, false)
 }
 
-// Format for gotags-generated output.
+var fset = token.NewFileSet()
+
+func computeTags(inputs iter.Seq[string], output io.Writer, quiet bool) {
+	unhandledFiles := make([]string, 0)
+	for inputFn := range inputs {
+		if path.Ext(inputFn) != ".go" {
+			unhandledFiles = append(unhandledFiles, inputFn)
+			continue
+		}
+		fmt.Fprintf(output, "\x0C\x0A%s,0", inputFn)
+
+		inputBytes, err := os.ReadFile(inputFn)
+		if err != nil {
+			if !quiet {
+				log.Printf("Skipping %s: %v", inputFn, err)
+			}
+			continue
+		}
+		inputText := string(inputBytes)
+
+		f, err := parser.ParseFile(fset, inputFn, inputText, parser.SkipObjectResolution)
+		if err == nil {
+			goTags(inputFn, inputText, f, output)
+		} else {
+			if !quiet {
+				log.Printf("Reverting to etags parsing for %s: %v", inputFn, err)
+			}
+			builtinEtags(inputFn, inputText, output)
+		}
+
+		fmt.Fprintf(output, "\x0A")
+	}
+	if len(unhandledFiles) > 0 && *systemEtagsCommand != "" {
+		systemEtags(unhandledFiles, output)
+	}
+}
+
+// Format for goTags-generated and builtinEtags-generated output.
 //
 // The full tag file syntax and a fair bit of its semantics are described by etc/ETAGS.EBNF in the
 // Emacs sources.  Gotags generates a file that does not use "include" sections or file properties,
@@ -136,44 +173,7 @@ Options:
 // Per the standard semantics, as we do not use implicit tags the pattern always ends with the
 // tagname.
 
-var fset = token.NewFileSet()
-
-func gotags(inputs iter.Seq[string], output io.Writer, quiet bool) {
-	unhandledFiles := make([]string, 0)
-	for inputFn := range inputs {
-		if path.Ext(inputFn) != ".go" {
-			unhandledFiles = append(unhandledFiles, inputFn)
-			continue
-		}
-		fmt.Fprintf(output, "\x0C\x0A%s,0", inputFn)
-
-		inputBytes, err := os.ReadFile(inputFn)
-		if err != nil {
-			if !quiet {
-				log.Printf("Skipping %s: %v", inputFn, err)
-			}
-			continue
-		}
-		inputText := string(inputBytes)
-
-		f, err := parser.ParseFile(fset, inputFn, inputText, parser.SkipObjectResolution)
-		if err == nil {
-			semtags(inputFn, inputText, f, output)
-		} else {
-			if !quiet {
-				log.Printf("Reverting to etags parsing for %s: %v", inputFn, err)
-			}
-			builtinEtags(inputFn, inputText, output)
-		}
-
-		fmt.Fprintf(output, "\x0A")
-	}
-	if len(unhandledFiles) > 0 && *systemEtagsCommand != "" {
-		systemEtags(unhandledFiles, output)
-	}
-}
-
-func semtags(inputFn, inputText string, f *ast.File, output io.Writer) {
+func goTags(inputFn, inputText string, f *ast.File, output io.Writer) {
 	if *verbose {
 		log.Printf("Gotags: %s", inputFn)
 	}
