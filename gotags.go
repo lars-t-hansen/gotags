@@ -37,6 +37,10 @@ wrt the location of the output file as in etags, nor has it support for other ex
 functionality, such as compressed files.
 
 Files that are passed to the native etags are processed entirely according to etags's semantics.
+
+To use gotags with Emacs's etags-regen-mode it is sufficient to set etags-program-name to
+"gotags" in your .emacs.  Note however that gotags does not yet respect any regular expression
+settings in that mode for any language.
 */
 package main
 
@@ -55,6 +59,8 @@ import (
 	"slices"
 	"strings"
 )
+
+const VERSION = "0.2.0-devel"
 
 // Command line arguments
 var (
@@ -91,6 +97,8 @@ func main() {
 
 // Annoyingly, Emacs will invoke us as `gotags - -o fn` which the Go parser does not handle
 // directly.  So we implement our own parsing.
+//
+// etags prints help and version on stdout, so we do too.
 
 func parseArguments() {
 	n := len(os.Args)
@@ -101,7 +109,7 @@ func parseArguments() {
 		i++
 		switch arg {
 		case "-h":
-			fmt.Fprintf(os.Stderr, `Usage: gotags [options] input-filename ...
+			fmt.Printf(`Usage: gotags [options] input-filename ...
 
 Input-filename can be "-" to denote that filenames will be read from stdin.
 
@@ -113,6 +121,8 @@ Options:
   Filename of output file, "-" for stdout, default "%s"
 -v
   Enable verbose output (for debugging).
+-V, --version
+  Print version information.
 `, systemEtagsCommand, outname)
 			os.Exit(0)
 
@@ -126,6 +136,10 @@ Options:
 
 		case "-v":
 			verbose = true
+
+		case "-V", "--version":
+			fmt.Printf("gotags v%s (etags compatible)\n", VERSION)
+			os.Exit(0)
 
 		case "--etags":
 			if i == n {
