@@ -10,5 +10,8 @@ README.md: gotags.go Makefile
 	echo >> README.md
 	go doc | expand -t4 | awk '/^func / { exit } { print }' >> README.md
 
+gotags: *.go
+	go build
+
 TAGS: gotags *.go
 	./gotags *.go
