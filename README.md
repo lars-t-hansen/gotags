@@ -20,7 +20,7 @@ The flags are:
         Write output to output-filename rather than to TAGS.  If output-filename
         is "-" then write to standard output.
 
-    -etags pathname
+    --etags pathname
         The name of the native etags command if not /usr/bin/etags, or specify
         the empty string to disable the use of native etags for non-Go files.
 

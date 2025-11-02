@@ -19,7 +19,7 @@ The flags are:
 	    Write output to output-filename rather than to TAGS.  If output-filename
 	    is "-" then write to standard output.
 
-	-etags pathname
+	--etags pathname
 		The name of the native etags command if not /usr/bin/etags, or specify
 		the empty string to disable the use of native etags for non-Go files.
 
@@ -41,7 +41,6 @@ Files that are passed to the native etags are processed entirely according to et
 package main
 
 import (
-	"flag"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -57,43 +56,30 @@ import (
 	"strings"
 )
 
+// Command line arguments
 var (
-	outname            = flag.String("o", "TAGS", "`Filename` of output file, \"-\" for stdout")
-	systemEtagsCommand = flag.String("etags", "/usr/bin/etags", "`Path` of the native etags, \"\" to disable")
-	verbose            = flag.Bool("v", false, "Verbose (for debugging)")
+	outname            = "TAGS"
+	systemEtagsCommand = "/usr/bin/etags"
+	verbose            = false
+	inputFilenames     = make([]string, 0)
 )
 
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(
-			flag.CommandLine.Output(), `Usage of %s:
-
-  %s [options] input-filename ...
-
-where input-filename can be "-" to denote that filenames will be read from stdin.
-
-Options:
-`,
-			os.Args[0],
-			os.Args[0])
-		flag.PrintDefaults()
-	}
-	flag.Parse()
+	parseArguments()
 
 	var inputs iter.Seq[string]
-	rest := flag.Args()
-	if len(rest) == 1 && rest[0] == "-" {
+	if len(inputFilenames) == 1 && inputFilenames[0] == "-" {
 		inputs = generateLines(os.Stdin)
 	} else {
-		inputs = slices.Values(rest)
+		inputs = slices.Values(inputFilenames)
 	}
 
 	var output *os.File
-	if *outname == "-" {
+	if outname == "-" {
 		output = os.Stdout
 	} else {
 		var err error
-		output, err = os.Create(*outname)
+		output, err = os.Create(outname)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -101,6 +87,66 @@ Options:
 	}
 
 	computeTags(inputs, output, false)
+}
+
+// Annoyingly, Emacs will invoke us as `gotags - -o fn` which the Go parser does not handle
+// directly.  So we implement our own parsing.
+
+func parseArguments() {
+	n := len(os.Args)
+	i := 1
+	bad := false
+	for i < n && !bad {
+		arg := os.Args[i]
+		i++
+		switch arg {
+		case "-h":
+			fmt.Fprintf(os.Stderr, `Usage: gotags [options] input-filename ...
+
+where input-filename can be "-" to denote that filenames will be read from stdin.
+
+Options:
+
+--etags pathname
+  Path of the native etags program, "" to disable this functionality, default "%s"
+-o filename
+  Filename of output file, "-" for stdout, default "%s"
+-v
+  Enable verbose output (for debugging).
+`, outname, systemEtagsCommand)
+			os.Exit(0)
+
+		case "-o":
+			if i == n {
+				bad = true
+			} else {
+				outname = os.Args[i]
+				i++
+			}
+
+		case "-v":
+			verbose = true
+
+		case "--etags":
+			if i == n {
+				bad = true
+			} else {
+				systemEtagsCommand = os.Args[i]
+				i++
+			}
+
+		default:
+			if arg[0] == '-' && len(arg) > 1 {
+				bad = true
+			} else {
+				inputFilenames = append(inputFilenames, arg)
+			}
+		}
+	}
+	if bad {
+		fmt.Fprintf(os.Stderr, "Bad command line arguments.  Try -h.")
+		os.Exit(2)
+	}
 }
 
 var fset = token.NewFileSet()
@@ -135,7 +181,7 @@ func computeTags(inputs iter.Seq[string], output io.Writer, quiet bool) {
 
 		fmt.Fprintf(output, "\x0A")
 	}
-	if len(unhandledFiles) > 0 && *systemEtagsCommand != "" {
+	if len(unhandledFiles) > 0 && systemEtagsCommand != "" {
 		systemEtags(unhandledFiles, output)
 	}
 }
@@ -174,7 +220,7 @@ func computeTags(inputs iter.Seq[string], output io.Writer, quiet bool) {
 // tagname.
 
 func goTags(inputFn, inputText string, f *ast.File, output io.Writer) {
-	if *verbose {
+	if verbose {
 		log.Printf("Gotags: %s", inputFn)
 	}
 	makeTag(inputText, f.Name, output)
@@ -231,7 +277,7 @@ var etagsRe = regexp.MustCompile(`^(?:((?:package|func(?:\s*\([^)]+\))?|type|var
 // Note we have no file offsets.  We could fix that.
 
 func builtinEtags(inputFn, inputText string, output io.Writer) {
-	if *verbose {
+	if verbose {
 		log.Printf("Builtin etags: %s", inputFn)
 	}
 	lineno := 0
@@ -244,12 +290,12 @@ func builtinEtags(inputFn, inputText string, output io.Writer) {
 }
 
 func systemEtags(names []string, output io.Writer) {
-	if *verbose {
+	if verbose {
 		for _, inputFn := range names {
 			log.Printf("System etags: %s", inputFn)
 		}
 	}
-	cmd := exec.Command(*systemEtagsCommand, "-o", "-", "-")
+	cmd := exec.Command(systemEtagsCommand, "-o", "-", "-")
 	cmd.Stdin = strings.NewReader(strings.Join(names, "\n"))
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
