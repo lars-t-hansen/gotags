@@ -103,7 +103,7 @@ func parseArguments() {
 		case "-h":
 			fmt.Fprintf(os.Stderr, `Usage: gotags [options] input-filename ...
 
-where input-filename can be "-" to denote that filenames will be read from stdin.
+Input-filename can be "-" to denote that filenames will be read from stdin.
 
 Options:
 
@@ -113,7 +113,7 @@ Options:
   Filename of output file, "-" for stdout, default "%s"
 -v
   Enable verbose output (for debugging).
-`, outname, systemEtagsCommand)
+`, systemEtagsCommand, outname)
 			os.Exit(0)
 
 		case "-o":
