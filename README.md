@@ -47,6 +47,7 @@ support for other exotic etags functionality, such as compressed files.
 Files that are passed to the native etags are processed entirely according to
 etags's semantics.
 
-To use gotags with Emacs's etags-regen-mode it is sufficient to set
-etags-program-name to "gotags" in your .emacs. Note however that gotags does not
-yet respect any regular expression settings in that mode for any language.
+To use gotags with Emacs's etags-regen-mode or complete-symbol it is sufficient
+to set etags-program-name to "gotags" in your .emacs. Note however that gotags
+does not yet respect any regular expression settings in that mode for any
+language.

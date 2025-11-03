@@ -21,6 +21,8 @@ var (
 )
 var v6, v7 int //D |var v6|var v6, v7|
 
+var v8 int; var v9 int //D |var v8|var v8 int; var v9|
+
 func f1(x int) { } //D |func f1|
 func (self *t3) m1(y int) { } //D |func (self *t3) m1|
 
@@ -28,4 +30,9 @@ func f2[T any](x int) { //D |func f2|
 	var lv1 int
 	const lc1 = 10
 	type lt1 = int
+}
+
+type i1 interface {				//D |type i1|
+	if1(x int) int 				//D |	if1|
+	if2(y int) int				//D |	if2|
 }

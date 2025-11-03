@@ -44,9 +44,9 @@ functionality, such as compressed files.
 
 Files that are passed to the native etags are processed entirely according to etags's semantics.
 
-To use gotags with Emacs's etags-regen-mode it is sufficient to set etags-program-name to
-"gotags" in your .emacs.  Note however that gotags does not yet respect any regular expression
-settings in that mode for any language.
+To use gotags with Emacs's etags-regen-mode or complete-symbol it is sufficient to set
+etags-program-name to "gotags" in your .emacs.  Note however that gotags does not yet respect any
+regular expression settings in that mode for any language.
 */
 package main
 
@@ -253,7 +253,15 @@ func goTags(inputFn, inputText string, f *ast.File, output io.Writer) {
 			switch item.Tok {
 			case token.TYPE:
 				for _, spec := range item.Specs {
-					makeTag(inputText, spec.(*ast.TypeSpec).Name, output)
+					ts := spec.(*ast.TypeSpec)
+					makeTag(inputText, ts.Name, output)
+					if it, ok := ts.Type.(*ast.InterfaceType); ok {
+						for _, field := range it.Methods.List {
+							if _, ok := field.Type.(*ast.FuncType); ok {
+								makeTag(inputText, field.Names[0], output)
+							}
+						}
+					}
 				}
 			case token.VAR, token.CONST:
 				for _, spec := range item.Specs {
