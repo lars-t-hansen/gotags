@@ -66,7 +66,7 @@ import (
 	"strings"
 )
 
-const VERSION = "0.2.0-devel"
+const VERSION = "0.2.0"
 
 // Command line arguments
 var (
