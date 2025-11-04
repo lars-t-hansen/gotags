@@ -31,10 +31,11 @@ The flags are:
         Print help and exit.
 
 Tags are generated for all Go global names: packages, types, constants,
-functions, and variables, irrespective of the declaration syntax. In contrast,
-etags does not handle constants or variables, nor types defined inside type
-lists, nor functions or types with type parameters, and it can mistake local
-type declarations for global ones.
+functions, variables, and members of global interfaces, irrespective of the
+declaration syntax. In contrast, etags does not handle constants or variables,
+nor types defined inside type lists, nor functions or types with type
+parameters, nor interface members, and it can mistake local type declarations
+for global ones.
 
 For full functionality, gotags requires each Go input file to be syntactically
 well-formed in the sense of "go/parser". If a .go file cannot be parsed,
