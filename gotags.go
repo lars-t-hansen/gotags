@@ -64,6 +64,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"gotags/utils"
 )
 
 const VERSION = "0.3.0-devel"
@@ -81,7 +83,7 @@ func main() {
 
 	var inputs iter.Seq[string]
 	if len(inputFilenames) == 1 && inputFilenames[0] == "-" {
-		inputs = generateLines(os.Stdin)
+		inputs = utils.GenerateLinesFromReader(os.Stdin)
 	} else {
 		inputs = slices.Values(inputFilenames)
 	}
@@ -115,7 +117,8 @@ func parseArguments() {
 		i++
 		switch arg {
 		case "-h":
-			fmt.Printf(`Usage: gotags [options] input-filename ...
+			fmt.Printf(
+				`Usage: gotags [options] input-filename ...
 
 Input-filename can be "-" to denote that filenames will be read from stdin.
 
@@ -129,7 +132,8 @@ Options:
   Enable verbose output (for debugging).
 -V, --version
   Print version information.
-`, systemEtagsCommand, outname)
+`,
+				systemEtagsCommand, outname)
 			os.Exit(0)
 
 		case "-o":

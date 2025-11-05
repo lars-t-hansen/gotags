@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
+// From https://github.com/lars-t-hansen/util/go-utils
 
-package main
+package utils
 
 import (
 	"bufio"
@@ -8,7 +9,7 @@ import (
 	"iter"
 )
 
-func generateLines(input io.Reader) iter.Seq[string] {
+func GenerateLinesFromReader(input io.Reader) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		scanner := bufio.NewScanner(input)
 		for scanner.Scan() {
