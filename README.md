@@ -20,6 +20,9 @@ The flags are:
         Write output to output-filename rather than to TAGS.  If output-filename
         is "-" then write to standard output.
 
+    --no-members
+        Do not tag member variables.
+
     --etags pathname
         The name of the native etags command if not /usr/bin/etags, or specify
         the empty string to disable the use of native etags for non-Go files.
@@ -31,11 +34,11 @@ The flags are:
         Print help and exit.
 
 Tags are generated for all Go global names: packages, types, constants,
-functions, variables, and members of global interfaces, irrespective of the
-declaration syntax. In contrast, etags does not handle constants or variables,
-nor types defined inside type lists, nor functions or types with type
-parameters, nor interface members, and it can mistake local type declarations
-for global ones.
+functions, variables, and members of global interfaces and structs, irrespective
+of the declaration syntax. In contrast, etags does not handle constants or
+variables, nor types defined inside type lists, nor functions or types with
+type parameters, nor interface or struct members, and it can mistake local type
+declarations for global ones.
 
 For full functionality, gotags requires each Go input file to be syntactically
 well-formed in the sense of "go/parser". If a .go file cannot be parsed,
