@@ -30,6 +30,10 @@ The flags are:
     -V, --version
         Print version information and exit.
 
+    -q, --quiet
+        Do not print warnings about falling back to primitive etags (but do print warnings about
+        not being able to run the system etags)
+
     -h
         Print help and exit.
 

@@ -29,6 +29,10 @@ The flags are:
 	-V, --version
 		Print version information and exit.
 
+	-q, --quiet
+		Do not print warnings about falling back to primitive etags (but do print warnings about
+		not being able to run the system etags)
+
 	-h
 		Print help and exit.
 
@@ -78,6 +82,7 @@ const VERSION = "0.3.0-devel"
 var (
 	outname            = "TAGS"
 	systemEtagsCommand = "/usr/bin/etags"
+	quiet              = false
 	verbose            = false
 	inputFilenames     = make([]string, 0)
 	members            = true
@@ -105,7 +110,7 @@ func main() {
 		defer output.Close()
 	}
 
-	computeTags(inputs, output, false)
+	computeTags(inputs, output)
 }
 
 // Annoyingly, Emacs will invoke us as `gotags - -o fn` which the Go parser does not handle
@@ -137,6 +142,8 @@ Options:
   Filename of output file, "-" for stdout, default "%s"
 -v
   Enable verbose output (for debugging).
+-q, --quiet
+  Suppress most warnings
 -V, --version
   Print version information.
 `,
@@ -157,6 +164,9 @@ Options:
 		case "-V", "--version":
 			fmt.Printf("gotags v%s (etags compatible)\n", VERSION)
 			os.Exit(0)
+
+		case "-q", "--quiet":
+			quiet = true
 
 		case "--etags":
 			if i == n {
@@ -185,7 +195,7 @@ Options:
 
 var fset = token.NewFileSet()
 
-func computeTags(inputs iter.Seq[string], output io.Writer, quiet bool) {
+func computeTags(inputs iter.Seq[string], output io.Writer) {
 	unhandledFiles := make([]string, 0)
 	for inputFn := range inputs {
 		if path.Ext(inputFn) != ".go" {
