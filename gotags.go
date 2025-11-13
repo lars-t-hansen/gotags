@@ -19,6 +19,9 @@ The flags are:
 	    Write output to output-filename rather than to TAGS.  If output-filename
 	    is "-" then write to standard output.
 
+	--no-members
+		Do not tag member variables.
+
 	--etags pathname
 		The name of the native etags command if not /usr/bin/etags, or specify
 		the empty string to disable the use of native etags for non-Go files.
@@ -30,9 +33,10 @@ The flags are:
 		Print help and exit.
 
 Tags are generated for all Go global names: packages, types, constants, functions, variables, and
-members of global interfaces, irrespective of the declaration syntax.  In contrast, etags does not
-handle constants or variables, nor types defined inside type lists, nor functions or types with
-type parameters, nor interface members, and it can mistake local type declarations for global ones.
+members of global interfaces and structs, irrespective of the declaration syntax.  In contrast,
+etags does not handle constants or variables, nor types defined inside type lists, nor functions or
+types with type parameters, nor interface or struct members, and it can mistake local type
+declarations for global ones.
 
 For full functionality, gotags requires each Go input file to be syntactically well-formed in the
 sense of "go/parser".  If a .go file cannot be parsed, gotags prints a warning and falls back to
@@ -76,6 +80,7 @@ var (
 	systemEtagsCommand = "/usr/bin/etags"
 	verbose            = false
 	inputFilenames     = make([]string, 0)
+	members            = true
 )
 
 func main() {
@@ -126,6 +131,8 @@ Options:
 
 --etags pathname
   Path of the native etags program, "" to disable this functionality, default "%s"
+--no-members
+  Do not tag member variables
 -o filename
   Filename of output file, "-" for stdout, default "%s"
 -v
@@ -158,6 +165,9 @@ Options:
 				systemEtagsCommand = os.Args[i]
 				i++
 			}
+
+		case "--no-members":
+			members = false
 
 		default:
 			if arg[0] == '-' && len(arg) > 1 {
@@ -265,6 +275,8 @@ func goTags(inputFn, inputText string, f *ast.File, output io.Writer) {
 								makeTag(inputText, field.Names[0], output)
 							}
 						}
+					} else if it, ok := ts.Type.(*ast.StructType); members && ok {
+						structTypeTags(inputText, it, output)
 					}
 				}
 			case token.VAR, token.CONST:
@@ -273,8 +285,24 @@ func goTags(inputFn, inputText string, f *ast.File, output io.Writer) {
 					for _, name := range vs.Names {
 						makeTag(inputText, name, output)
 					}
+					if item.Tok == token.VAR {
+						if it, ok := vs.Type.(*ast.StructType); members && ok {
+							structTypeTags(inputText, it, output)
+						}
+					}
 				}
 			}
+		}
+	}
+}
+
+func structTypeTags(inputText string, it *ast.StructType, output io.Writer) {
+	for _, field := range it.Fields.List {
+		for _, name := range field.Names {
+			makeTag(inputText, name, output)
+		}
+		if it, ok := field.Type.(*ast.StructType); ok {
+			structTypeTags(inputText, it, output)
 		}
 	}
 }

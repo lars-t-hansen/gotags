@@ -6,7 +6,13 @@ type (
 	t2 = bool //D |	t2|
 	t3 struct { } //D |	t3|
 )
-type t4[T any] struct { } //D |type t4|
+type t4[T any] struct { //D |type t4|
+	fld1 int //D |	fld1|
+	fld2, fld3 bool //D |	fld2|	fld2, fld3|
+	fld4 struct {	//D |	fld4|
+		fld5 int    //D |		fld5|
+	}
+}
 
 const c1 = 5 //D |const c1|
 const (
@@ -22,6 +28,12 @@ var (
 var v6, v7 int //D |var v6|var v6, v7|
 
 var v8 int; var v9 int //D |var v8|var v8 int; var v9|
+
+var v9 struct { //D |var v9|
+	vfld1 struct { //D |	vfld1|
+		vfld2 int //D |		vfld2|
+	}
+}
 
 func f1(x int) { } //D |func f1|
 func (self *t3) m1(y int) { } //D |func (self *t3) m1|
