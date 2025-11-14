@@ -381,6 +381,8 @@ func systemEtags(names []string, output io.Writer) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
+	// The issue here is that errText is stderr output from the program itself, but if the program
+	// failed to launch there is error text in err, handled later.
 	errText := stderr.String()
 	if errText != "" {
 		for _, line := range strings.Split(stderr.String(), "\n") {
@@ -389,8 +391,10 @@ func systemEtags(names []string, output io.Writer) {
 	}
 	fmt.Fprint(output, stdout.String())
 	if err != nil {
+		log.Print(err)
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
 			os.Exit(exitErr.ExitCode())
 		}
+		os.Exit(1)
 	}
 }
