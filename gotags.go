@@ -375,7 +375,11 @@ func systemEtags(names []string, output io.Writer) {
 			log.Printf("System etags: %s", inputFn)
 		}
 	}
-	cmd := exec.Command(systemEtagsCommand, "-o", "-", "-")
+	args := []string{"-o", "-", "-"}
+	if !members {
+		args = append(args, "--no-members")
+	}
+	cmd := exec.Command(systemEtagsCommand, args...)
 	cmd.Stdin = strings.NewReader(strings.Join(names, "\n"))
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
