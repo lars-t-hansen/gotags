@@ -78,18 +78,108 @@ import (
 
 const VERSION = "0.3.0-devel"
 
-// Command line arguments
 var (
 	outname            = "TAGS"
 	systemEtagsCommand = "/usr/bin/etags"
 	quiet              = false
 	verbose            = false
+	version            = false
+	help               = false
 	inputFilenames     = make([]string, 0)
 	members            = true
 )
 
+var opts = []utils.Option{
+	utils.Option{
+		Short: 'h',
+		Long: "help",
+		Help: "Print usage summary",
+		Handler: utils.SetFlag(&help),
+	},
+	utils.Option{
+		Short: 'o',
+		Help: fmt.Sprintf("`Filename` of output file, \"-\" for stdout, default \"%s\"", outname),
+		Value: true,
+		Handler: utils.SetString(&outname),
+	},
+	utils.Option{
+		Short: 'q',
+		Long: "quiet",
+		Help: "Suppress most warnings",
+		Handler: utils.SetFlag(&quiet),
+	},
+	utils.Option{
+		Short: 'v',
+		Long: "verbose",
+		Help: "Enable verbose output (for debugging)",
+		Handler: utils.SetFlag(&verbose),
+	},
+	utils.Option{
+		Short: 'V',
+		Long: "version",
+		Help: "Print version information",
+		Handler: utils.SetFlag(&version),
+	},
+	utils.Option{
+		Long: "etags",
+		Help: fmt.Sprintf(
+			"`Filename` of the native etags program, \"\" to disable this functionality, default \"%s\"",
+			systemEtagsCommand,
+		),
+		Value: true,
+		Handler: utils.SetString(&systemEtagsCommand),
+	},
+	utils.Option{
+		Long: "no-members",
+		Help: "Do not tag member variables",
+		Handler: func (_ string) error {
+			members = false
+			return nil
+		},
+	},
+	utils.Option{
+		Short: '-',
+		Repeatable: true,
+		Handler: pushString(&inputFilenames),
+	},
+	utils.Option{
+		Value: true,
+		Repeatable: true,
+		Handler: pushString(&inputFilenames),
+	},
+}
+
+func pushString(ss *[]string) func(string) error {
+	return func(s string) error {
+		*ss = append(*ss, s)
+		return nil
+	}
+}
+
+// etags prints help and version on stdout, so we do too.
+
 func main() {
-	parseArguments()
+	rest, err := utils.GetOpts(opts, os.Args[1:])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Bad command line arguments: %s.  Try -h\n", err.Error())
+		os.Exit(2)
+	}
+	inputFilenames = append(inputFilenames, rest...)
+	if help {
+		fmt.Printf("Usage: gotags [options] input-filename ...\n\n")
+		fmt.Printf("Input-filename can be \"-\" to denote that filenames will be read from stdin.\n\n")
+		fmt.Printf("Options:\n\n")
+		utils.PrintOpts(os.Stdout, opts)
+		os.Exit(0)
+	}
+	if version {
+		fmt.Printf("gotags v%s (etags compatible)\n", VERSION)
+		os.Exit(0)
+	}
+	if len(inputFilenames) == 0 {
+		fmt.Fprintf(os.Stderr, "No input files.  Try -h\n")
+		os.Exit(2)
+	}
 
 	var inputs iter.Seq[string]
 	if len(inputFilenames) == 1 && inputFilenames[0] == "-" {
@@ -111,86 +201,6 @@ func main() {
 	}
 
 	computeTags(inputs, output)
-}
-
-// Annoyingly, Emacs will invoke us as `gotags - -o fn` which the Go parser does not handle
-// directly.  So we implement our own parsing.
-//
-// etags prints help and version on stdout, so we do too.
-
-func parseArguments() {
-	n := len(os.Args)
-	i := 1
-	bad := false
-	for i < n && !bad {
-		arg := os.Args[i]
-		i++
-		switch arg {
-		case "-h":
-			fmt.Printf(
-				`Usage: gotags [options] input-filename ...
-
-Input-filename can be "-" to denote that filenames will be read from stdin.
-
-Options:
-
---etags pathname
-  Path of the native etags program, "" to disable this functionality, default "%s"
---no-members
-  Do not tag member variables
--o filename
-  Filename of output file, "-" for stdout, default "%s"
--v
-  Enable verbose output (for debugging).
--q, --quiet
-  Suppress most warnings
--V, --version
-  Print version information.
-`,
-				systemEtagsCommand, outname)
-			os.Exit(0)
-
-		case "-o":
-			if i == n {
-				bad = true
-			} else {
-				outname = os.Args[i]
-				i++
-			}
-
-		case "-v":
-			verbose = true
-
-		case "-V", "--version":
-			fmt.Printf("gotags v%s (etags compatible)\n", VERSION)
-			os.Exit(0)
-
-		case "-q", "--quiet":
-			quiet = true
-
-		case "--etags":
-			if i == n {
-				bad = true
-			} else {
-				systemEtagsCommand = os.Args[i]
-				i++
-			}
-
-		case "--no-members":
-			members = false
-
-		default:
-			if arg[0] == '-' && len(arg) > 1 {
-				bad = true
-			} else {
-				inputFilenames = append(inputFilenames, arg)
-			}
-		}
-	}
-	if bad {
-		fmt.Fprintf(os.Stderr, "Bad command line arguments.  Try -h.")
-		os.Exit(2)
-	}
 }
 
 var fset = token.NewFileSet()
