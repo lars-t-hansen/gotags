@@ -13,5 +13,6 @@ README.md: gotags.go Makefile
 gotags: *.go
 	go build
 
-TAGS: gotags *.go
-	./gotags *.go
+TAGS: gotags *.go utils/*.go
+	./gotags *.go utils/*.go
+
