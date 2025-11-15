@@ -9,32 +9,7 @@ the names of input files are read from standard input, one name per line.
 Input files with extension other than .go are processed by the native etags into the specified output
 file.
 
-Usage:
-
-	gotags [flags] input-filename ...
-
-The flags are:
-
-	-o output-filename
-	    Write output to output-filename rather than to TAGS.  If output-filename
-	    is "-" then write to standard output.
-
-	--no-members
-		Do not tag member variables.
-
-	--etags pathname
-		The name of the native etags command if not /usr/bin/etags, or specify
-		the empty string to disable the use of native etags for non-Go files.
-
-	-V, --version
-		Print version information and exit.
-
-	-q, --quiet
-		Do not print warnings about falling back to primitive etags (but do print warnings about
-		not being able to run the system etags)
-
-	-h
-		Print help and exit.
+&&USAGE will be inserted here by `make README.md`, or run gotags -h to see it&&
 
 Tags are generated for all Go global names: packages, types, constants, functions, variables, and
 members of global interfaces and structs, irrespective of the declaration syntax.  In contrast,
@@ -123,7 +98,7 @@ var opts = []utils.Option{
 	utils.Option{
 		Long: "etags",
 		Help: fmt.Sprintf(
-			"`Filename` of the native etags program, \"\" to disable this functionality, default \"%s\"",
+			"`Filename` of the native etags program, \"\" to disable this functionality,\n    default \"%s\"",
 			systemEtagsCommand,
 		),
 		Value: true,
@@ -166,7 +141,8 @@ func main() {
 	}
 	inputFilenames = append(inputFilenames, rest...)
 	if help {
-		fmt.Printf("Usage: gotags [options] input-filename ...\n\n")
+		fmt.Printf("Usage:\n\n")
+		fmt.Printf("    gotags [options] input-filename ...\n\n")
 		fmt.Printf("Input-filename can be \"-\" to denote that filenames will be read from stdin.\n\n")
 		fmt.Printf("Options:\n\n")
 		utils.PrintOpts(os.Stdout, opts)

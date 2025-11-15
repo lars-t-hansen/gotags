@@ -12,30 +12,27 @@ the specified output file.
 
 Usage:
 
-    gotags [flags] input-filename ...
+    gotags [options] input-filename ...
 
-The flags are:
+Input-filename can be "-" to denote that filenames will be read from stdin.
 
-    -o output-filename
-        Write output to output-filename rather than to TAGS.  If output-filename
-        is "-" then write to standard output.
+Options:
 
-    --no-members
-        Do not tag member variables.
-
-    --etags pathname
-        The name of the native etags command if not /usr/bin/etags, or specify
-        the empty string to disable the use of native etags for non-Go files.
-
-    -V, --version
-        Print version information and exit.
-
-    -q, --quiet
-        Do not print warnings about falling back to primitive etags (but do print warnings about
-        not being able to run the system etags)
-
-    -h
-        Print help and exit.
+  -h, --help
+    Print usage summary
+  -o filename
+    `Filename` of output file, "-" for stdout, default "TAGS"
+  -q, --quiet
+    Suppress most warnings
+  -v, --verbose
+    Enable verbose output (for debugging)
+  -V, --version
+    Print version information
+  --etags filename
+    `Filename` of the native etags program, "" to disable this functionality,
+    default "/usr/bin/etags"
+  --no-members
+    Do not tag member variables
 
 Tags are generated for all Go global names: packages, types, constants,
 functions, variables, and members of global interfaces and structs, irrespective
