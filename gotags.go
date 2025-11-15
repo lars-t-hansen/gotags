@@ -142,7 +142,7 @@ func main() {
 	inputFilenames = append(inputFilenames, rest...)
 	if help {
 		fmt.Printf("Usage:\n\n")
-		fmt.Printf("    gotags [options] input-filename ...\n\n")
+		fmt.Printf("  gotags [options] input-filename ...\n\n")
 		fmt.Printf("Input-filename can be \"-\" to denote that filenames will be read from stdin.\n\n")
 		fmt.Printf("Options:\n\n")
 		utils.PrintOpts(os.Stdout, opts)

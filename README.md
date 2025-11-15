@@ -12,27 +12,27 @@ the specified output file.
 
 Usage:
 
-    gotags [options] input-filename ...
+	gotags [options] input-filename ...
 
 Input-filename can be "-" to denote that filenames will be read from stdin.
 
 Options:
 
-  -h, --help
-    Print usage summary
-  -o filename
-    `Filename` of output file, "-" for stdout, default "TAGS"
-  -q, --quiet
-    Suppress most warnings
-  -v, --verbose
-    Enable verbose output (for debugging)
-  -V, --version
-    Print version information
-  --etags filename
-    `Filename` of the native etags program, "" to disable this functionality,
-    default "/usr/bin/etags"
-  --no-members
-    Do not tag member variables
+	-h, --help
+		Print usage summary
+	-o filename
+		`Filename` of output file, "-" for stdout, default "TAGS"
+	-q, --quiet
+		Suppress most warnings
+	-v, --verbose
+		Enable verbose output (for debugging)
+	-V, --version
+		Print version information
+	--etags filename
+		`Filename` of the native etags program, "" to disable this functionality,
+		default "/usr/bin/etags"
+	--no-members
+		Do not tag member variables
 
 Tags are generated for all Go global names: packages, types, constants,
 functions, variables, and members of global interfaces and structs, irrespective
