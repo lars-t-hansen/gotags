@@ -61,6 +61,7 @@ var (
 	version            = false
 	help               = false
 	inputFilenames     = make([]string, 0)
+	namesFromStdin     = false
 	members            = true
 )
 
@@ -115,7 +116,7 @@ var opts = []utils.Option{
 	utils.Option{
 		Short: '-',
 		Repeatable: true,
-		Handler: pushString(&inputFilenames),
+		Handler: utils.SetFlag(&namesFromStdin),
 	},
 	utils.Option{
 		Value: true,
@@ -152,13 +153,17 @@ func main() {
 		fmt.Printf("gotags v%s (etags compatible)\n", VERSION)
 		os.Exit(0)
 	}
-	if len(inputFilenames) == 0 {
+	if !namesFromStdin && len(inputFilenames) == 0 {
 		fmt.Fprintf(os.Stderr, "No input files.  Try -h\n")
+		os.Exit(2)
+	}
+	if namesFromStdin && len(inputFilenames) > 0 {
+		fmt.Fprintf(os.Stderr, "Confused input files.  Try -h\n")
 		os.Exit(2)
 	}
 
 	var inputs iter.Seq[string]
-	if len(inputFilenames) == 1 && inputFilenames[0] == "-" {
+	if namesFromStdin {
 		inputs = utils.GenerateLinesFromReader(os.Stdin)
 	} else {
 		inputs = slices.Values(inputFilenames)
