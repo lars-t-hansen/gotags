@@ -40,7 +40,6 @@ import (
 	"go/token"
 	"io"
 	"iter"
-	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -67,33 +66,33 @@ var (
 
 var opts = []utils.Option{
 	utils.Option{
-		Short: 'h',
-		Long: "help",
-		Help: "Print usage summary",
+		Short:   'h',
+		Long:    "help",
+		Help:    "Print usage summary",
 		Handler: utils.SetFlag(&help),
 	},
 	utils.Option{
-		Short: 'o',
-		Help: fmt.Sprintf("`Filename` of output file, \"-\" for stdout, default \"%s\"", outname),
-		Value: true,
+		Short:   'o',
+		Help:    fmt.Sprintf("`Filename` of output file, \"-\" for stdout, default \"%s\"", outname),
+		Value:   true,
 		Handler: utils.SetString(&outname),
 	},
 	utils.Option{
-		Short: 'q',
-		Long: "quiet",
-		Help: "Suppress most warnings",
+		Short:   'q',
+		Long:    "quiet",
+		Help:    "Suppress most warnings",
 		Handler: utils.SetFlag(&quiet),
 	},
 	utils.Option{
-		Short: 'v',
-		Long: "verbose",
-		Help: "Enable verbose output (for debugging)",
+		Short:   'v',
+		Long:    "verbose",
+		Help:    "Enable verbose output (for debugging)",
 		Handler: utils.SetFlag(&verbose),
 	},
 	utils.Option{
-		Short: 'V',
-		Long: "version",
-		Help: "Print version information",
+		Short:   'V',
+		Long:    "version",
+		Help:    "Print version information",
 		Handler: utils.SetFlag(&version),
 	},
 	utils.Option{
@@ -102,26 +101,26 @@ var opts = []utils.Option{
 			"`Filename` of the native etags program, \"\" to disable this functionality,\n    default \"%s\"",
 			systemEtagsCommand,
 		),
-		Value: true,
+		Value:   true,
 		Handler: utils.SetString(&systemEtagsCommand),
 	},
 	utils.Option{
 		Long: "no-members",
 		Help: "Do not tag member variables",
-		Handler: func (_ string) error {
+		Handler: func(_ string) error {
 			members = false
 			return nil
 		},
 	},
 	utils.Option{
-		Short: '-',
+		Short:      '-',
 		Repeatable: true,
-		Handler: utils.SetFlag(&namesFromStdin),
+		Handler:    utils.SetFlag(&namesFromStdin),
 	},
 	utils.Option{
-		Value: true,
+		Value:      true,
 		Repeatable: true,
-		Handler: pushString(&inputFilenames),
+		Handler:    pushString(&inputFilenames),
 	},
 }
 
@@ -132,13 +131,19 @@ func pushString(ss *[]string) func(string) error {
 	}
 }
 
+var (
+	stdin  io.Reader = os.Stdin
+	stdout io.Writer = os.Stdout
+	stderr io.Writer = os.Stderr
+)
+
 func main() {
-	os.Exit(runMain(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+	os.Exit(runMain(os.Args[1:]))
 }
 
 // etags prints help and version on stdout, so we do too.
 
-func runMain(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func runMain(args []string) int {
 	rest, err := utils.GetOpts(opts, args)
 	if err != nil {
 		fmt.Fprintf(stderr, "Bad command line arguments: %s.  Try -h\n", err.Error())
@@ -179,7 +184,8 @@ func runMain(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	} else {
 		file, err := os.Create(outname)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Fprintf(stderr, "Could not create output file: %v\n", err)
+			return 1
 		}
 		defer file.Close()
 		output = file
@@ -202,7 +208,7 @@ func computeTags(inputs iter.Seq[string], output io.Writer) int {
 		inputBytes, err := os.ReadFile(inputFn)
 		if err != nil {
 			if !quiet {
-				log.Printf("Skipping %s: %v", inputFn, err)
+				fmt.Fprintf(stderr, "Skipping %s: %v\n", inputFn, err)
 			}
 			continue
 		}
@@ -213,7 +219,7 @@ func computeTags(inputs iter.Seq[string], output io.Writer) int {
 			goTags(inputFn, inputText, f, output)
 		} else {
 			if !quiet {
-				log.Printf("Reverting to etags parsing for %s: %v", inputFn, err)
+				fmt.Fprintf(stderr, "Reverting to etags parsing for %s: %v\n", inputFn, err)
 			}
 			builtinEtags(inputFn, inputText, output)
 		}
@@ -261,7 +267,7 @@ func computeTags(inputs iter.Seq[string], output io.Writer) int {
 
 func goTags(inputFn, inputText string, f *ast.File, output io.Writer) {
 	if verbose {
-		log.Printf("Gotags: %s", inputFn)
+		fmt.Fprintf(stdout, "Gotags: %s\n", inputFn)
 	}
 	makeTag(inputText, f.Name, output)
 	for _, d := range f.Decls {
@@ -344,7 +350,7 @@ var etagsRe = regexp.MustCompile(`^(?:((?:package|func(?:\s*\([^)]+\))?|type|var
 
 func builtinEtags(inputFn, inputText string, output io.Writer) {
 	if verbose {
-		log.Printf("Builtin etags: %s", inputFn)
+		fmt.Fprintf(stdout, "Builtin etags: %s\n", inputFn)
 	}
 	lineno := 0
 	for _, l := range strings.Split(inputText, "\n") {
@@ -358,7 +364,7 @@ func builtinEtags(inputFn, inputText string, output io.Writer) {
 func systemEtags(names []string, output io.Writer) int {
 	if verbose {
 		for _, inputFn := range names {
-			log.Printf("System etags: %s", inputFn)
+			fmt.Fprintf(stdout, "System etags: %s\n", inputFn)
 		}
 	}
 	args := []string{"-o", "-", "-"}
@@ -367,21 +373,19 @@ func systemEtags(names []string, output io.Writer) int {
 	}
 	cmd := exec.Command(systemEtagsCommand, args...)
 	cmd.Stdin = strings.NewReader(strings.Join(names, "\n"))
-	var stdout, stderr strings.Builder
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	var subStdout, subStderr strings.Builder
+	cmd.Stdout = &subStdout
+	cmd.Stderr = &subStderr
 	err := cmd.Run()
 	// The issue here is that errText is stderr output from the program itself, but if the program
 	// failed to launch there is error text in err, handled later.
-	errText := stderr.String()
+	errText := subStderr.String()
 	if errText != "" {
-		for _, line := range strings.Split(stderr.String(), "\n") {
-			log.Print(line)
-		}
+		fmt.Fprint(stderr, errText)
 	}
-	fmt.Fprint(output, stdout.String())
+	fmt.Fprint(output, subStdout.String())
 	if err != nil {
-		log.Print(err)
+		fmt.Fprint(stderr, err)
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
 			return exitErr.ExitCode()
 		}

@@ -139,9 +139,11 @@ func TestPipedNames(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove(outfile.Name())
-	input := strings.NewReader(strings.Join(testFiles, "\n"))
+	stdin = strings.NewReader(strings.Join(testFiles, "\n"))
 	var output strings.Builder
-	if r := runMain([]string{"-", "-o", outfile.Name()}, input, &output, &output); r != 0 {
+	stdout = &output
+	stderr = &output
+	if r := runMain([]string{"-", "-o", outfile.Name()}); r != 0 {
 		t.Fatalf("Exit code %d", r)
 	}
 	if conout := output.String(); conout != "" {
@@ -152,7 +154,7 @@ func TestPipedNames(t *testing.T) {
 	for scanner.Scan() {
 		l := scanner.Text()
 		for k, v := range filenames {
-			if strings.HasPrefix(l, v + ",") {
+			if strings.HasPrefix(l, v+",") {
 				delete(filenames, k)
 				break
 			}
