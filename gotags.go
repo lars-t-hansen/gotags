@@ -132,61 +132,65 @@ func pushString(ss *[]string) func(string) error {
 	}
 }
 
+func main() {
+	os.Exit(runMain(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
 // etags prints help and version on stdout, so we do too.
 
-func main() {
-	rest, err := utils.GetOpts(opts, os.Args[1:])
+func runMain(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	rest, err := utils.GetOpts(opts, args)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Bad command line arguments: %s.  Try -h\n", err.Error())
-		os.Exit(2)
+		fmt.Fprintf(stderr, "Bad command line arguments: %s.  Try -h\n", err.Error())
+		return 2
 	}
 	inputFilenames = append(inputFilenames, rest...)
 	if help {
-		fmt.Printf("Usage:\n\n")
-		fmt.Printf("  gotags [options] input-filename ...\n\n")
-		fmt.Printf("Input-filename can be \"-\" to denote that filenames will be read from stdin.\n\n")
-		fmt.Printf("Options:\n\n")
-		utils.PrintOpts(os.Stdout, opts)
-		os.Exit(0)
+		fmt.Fprintf(stdout, "Usage:\n\n")
+		fmt.Fprintf(stdout, "  gotags [options] input-filename ...\n\n")
+		fmt.Fprintf(stdout, "Input-filename can be \"-\" to denote that filenames will be read from stdin.\n\n")
+		fmt.Fprintf(stdout, "Options:\n\n")
+		utils.PrintOpts(stdout, opts)
+		return 0
 	}
 	if version {
-		fmt.Printf("gotags v%s (etags compatible)\n", VERSION)
-		os.Exit(0)
+		fmt.Fprintf(stdout, "gotags v%s (etags compatible)\n", VERSION)
+		return 0
 	}
 	if !namesFromStdin && len(inputFilenames) == 0 {
-		fmt.Fprintf(os.Stderr, "No input files.  Try -h\n")
-		os.Exit(2)
+		fmt.Fprintf(stderr, "No input files.  Try -h\n")
+		return 2
 	}
 	if namesFromStdin && len(inputFilenames) > 0 {
-		fmt.Fprintf(os.Stderr, "Confused input files.  Try -h\n")
-		os.Exit(2)
+		fmt.Fprintf(stderr, "Confused input files.  Try -h\n")
+		return 2
 	}
 
 	var inputs iter.Seq[string]
 	if namesFromStdin {
-		inputs = utils.GenerateLinesFromReader(os.Stdin)
+		inputs = utils.GenerateLinesFromReader(stdin)
 	} else {
 		inputs = slices.Values(inputFilenames)
 	}
 
-	var output *os.File
+	var output io.Writer
 	if outname == "-" {
-		output = os.Stdout
+		output = stdout
 	} else {
-		var err error
-		output, err = os.Create(outname)
+		file, err := os.Create(outname)
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer output.Close()
+		defer file.Close()
+		output = file
 	}
 
-	computeTags(inputs, output)
+	return computeTags(inputs, output)
 }
 
 var fset = token.NewFileSet()
 
-func computeTags(inputs iter.Seq[string], output io.Writer) {
+func computeTags(inputs iter.Seq[string], output io.Writer) int {
 	unhandledFiles := make([]string, 0)
 	for inputFn := range inputs {
 		if path.Ext(inputFn) != ".go" {
@@ -217,8 +221,9 @@ func computeTags(inputs iter.Seq[string], output io.Writer) {
 		fmt.Fprintf(output, "\x0A")
 	}
 	if len(unhandledFiles) > 0 && systemEtagsCommand != "" {
-		systemEtags(unhandledFiles, output)
+		return systemEtags(unhandledFiles, output)
 	}
+	return 0
 }
 
 // Format for goTags-generated and builtinEtags-generated output.
@@ -350,7 +355,7 @@ func builtinEtags(inputFn, inputText string, output io.Writer) {
 	}
 }
 
-func systemEtags(names []string, output io.Writer) {
+func systemEtags(names []string, output io.Writer) int {
 	if verbose {
 		for _, inputFn := range names {
 			log.Printf("System etags: %s", inputFn)
@@ -378,8 +383,9 @@ func systemEtags(names []string, output io.Writer) {
 	if err != nil {
 		log.Print(err)
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
-			os.Exit(exitErr.ExitCode())
+			return exitErr.ExitCode()
 		}
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }

@@ -3,7 +3,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"maps"
 	"os"
 	"regexp"
 	"slices"
@@ -17,6 +19,17 @@ var (
 	notInNameAtEnd = regexp.MustCompile(`([\t\f\r (),;=]*)$`)
 )
 
+// Each test file contains Go code and each line that should give rise to a tag has a comment
+// that starts with //D followed by a list of expected tag patterns for that line (with literal
+// tabs if necessary) separated by |, eg "|var v1|var v1, v2|" for a var decl that introduces
+// two names.  The tag names extracted from a pattern are the rightmost comma-separated
+// identifiers.
+//
+// The default assumption is that a file is well-formed Go, but it can switch modes by using a
+// "//builtin-etags" line or a "//native-etags" line.
+
+var testFiles = []string{"testdata/t1.go", "testdata/t2.go", "testdata/t3.c"}
+
 const (
 	mGotags = iota
 	mBuiltinEtags
@@ -24,18 +37,6 @@ const (
 )
 
 func TestTagging(t *testing.T) {
-
-	// Each test file contains Go code and each line that should give rise to a tag has a comment
-	// that starts with //D followed by a list of expected tag patterns for that line (with literal
-	// tabs if necessary) separated by |, eg "|var v1|var v1, v2|" for a var decl that introduces
-	// two names.  The tag names extracted from a pattern are the rightmost comma-separated
-	// identifiers.
-	//
-	// The default assumption is that a file is well-formed Go, but it can switch modes by using a
-	// "//builtin-etags" line or a "//native-etags" line.
-
-	testFiles := []string{"testdata/t1.go", "testdata/t2.go", "testdata/t3.c"}
-
 	var out strings.Builder
 	quiet = true
 	computeTags(slices.Values(testFiles), &out)
@@ -129,5 +130,35 @@ func TestTagging(t *testing.T) {
 	}
 	if o < len(outLines) {
 		t.Fatalf("Excess output: o=%d %s", o, outLines[o])
+	}
+}
+
+func TestPipedNames(t *testing.T) {
+	outfile, err := os.CreateTemp("", "piped")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(outfile.Name())
+	input := strings.NewReader(strings.Join(testFiles, "\n"))
+	var output strings.Builder
+	if r := runMain([]string{"-", "-o", outfile.Name()}, input, &output, &output); r != 0 {
+		t.Fatalf("Exit code %d", r)
+	}
+	if conout := output.String(); conout != "" {
+		t.Fatalf("Conout not empty: %s", conout)
+	}
+	scanner := bufio.NewScanner(outfile)
+	filenames := maps.Collect(slices.All(testFiles))
+	for scanner.Scan() {
+		l := scanner.Text()
+		for k, v := range filenames {
+			if strings.HasPrefix(l, v + ",") {
+				delete(filenames, k)
+				break
+			}
+		}
+	}
+	if len(filenames) != 0 {
+		t.Fatalf("Names left behind: %v", filenames)
 	}
 }
