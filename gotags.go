@@ -50,7 +50,7 @@ import (
 	"gotags/utils"
 )
 
-const VERSION = "0.4.0-devel"
+const VERSION = "0.4.0"
 
 var (
 	outname            string
