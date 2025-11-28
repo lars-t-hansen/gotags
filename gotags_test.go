@@ -37,10 +37,11 @@ const (
 )
 
 func TestTagging(t *testing.T) {
-	clearOptions()
 	var out strings.Builder
-	quiet = true
-	computeTags(slices.Values(testFiles), &out)
+	stdout = &out
+	if r := runMain(append([]string{"-o", "-", "-q"}, testFiles...)); r != 0 {
+		t.Fatalf("Exit %d", r)
+	}
 	outLines := strings.Split(out.String(), "\n")
 	o := 0 // Line number
 
