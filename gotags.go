@@ -53,16 +53,34 @@ import (
 const VERSION = "0.4.0-devel"
 
 var (
-	outname            = "TAGS"
-	systemEtagsCommand = "/usr/bin/etags"
-	quiet              = false
-	verbose            = false
-	version            = false
-	help               = false
-	inputFilenames     = make([]string, 0)
-	namesFromStdin     = false
-	members            = true
+	outname            string
+	systemEtagsCommand string
+	quiet              bool
+	verbose            bool
+	version            bool
+	help               bool
+	inputFilenames     []string
+	namesFromStdin     bool
+	members            bool
 )
+
+const (
+	defaultOutname = "TAGS"
+	defaultEtags   = "/usr/bin/etags"
+	defaultMembers = true
+)
+
+func clearOptions() {
+	outname = defaultOutname
+	systemEtagsCommand = defaultEtags
+	quiet = false
+	verbose = false
+	version = false
+	help = false
+	inputFilenames = make([]string, 0)
+	namesFromStdin = false
+	members = defaultMembers
+}
 
 var opts = []utils.Option{
 	utils.Option{
@@ -73,7 +91,7 @@ var opts = []utils.Option{
 	},
 	utils.Option{
 		Short:   'o',
-		Help:    fmt.Sprintf("`Filename` of output file, \"-\" for stdout, default \"%s\"", outname),
+		Help:    fmt.Sprintf("`Filename` of output file, \"-\" for stdout, default \"%s\"", defaultOutname),
 		Value:   true,
 		Handler: utils.SetString(&outname),
 	},
@@ -99,7 +117,7 @@ var opts = []utils.Option{
 		Long: "etags",
 		Help: fmt.Sprintf(
 			"`Filename` of the native etags program, \"\" to disable this functionality,\n    default \"%s\"",
-			systemEtagsCommand,
+			defaultEtags,
 		),
 		Value:   true,
 		Handler: utils.SetString(&systemEtagsCommand),
@@ -144,6 +162,8 @@ func main() {
 // etags prints help and version on stdout, so we do too.
 
 func runMain(args []string) int {
+	// runMain() will be run multiple times in the same process by tests.
+	clearOptions()
 	rest, err := utils.GetOpts(opts, args)
 	if err != nil {
 		fmt.Fprintf(stderr, "Bad command line arguments: %s.  Try -h\n", err.Error())

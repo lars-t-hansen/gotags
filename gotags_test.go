@@ -37,6 +37,7 @@ const (
 )
 
 func TestTagging(t *testing.T) {
+	clearOptions()
 	var out strings.Builder
 	quiet = true
 	computeTags(slices.Values(testFiles), &out)
@@ -133,6 +134,7 @@ func TestTagging(t *testing.T) {
 	}
 }
 
+// Filenames can be piped in via stdin, one per line
 func TestPipedNames(t *testing.T) {
 	outfile, err := os.CreateTemp("", "piped")
 	if err != nil {
@@ -146,9 +148,7 @@ func TestPipedNames(t *testing.T) {
 	if r := runMain([]string{"-", "-o", outfile.Name()}); r != 0 {
 		t.Fatalf("Exit code %d", r)
 	}
-	if conout := output.String(); conout != "" {
-		t.Fatalf("Conout not empty: %s", conout)
-	}
+	// Normally, stderr will have some output b/c we're reverting to etags parsing
 	scanner := bufio.NewScanner(outfile)
 	filenames := maps.Collect(slices.All(testFiles))
 	for scanner.Scan() {
@@ -162,5 +162,49 @@ func TestPipedNames(t *testing.T) {
 	}
 	if len(filenames) != 0 {
 		t.Fatalf("Names left behind: %v", filenames)
+	}
+}
+
+// Fallback from full parser to naive built-in parser b/c not well-formed Go.
+func TestFallback1(t *testing.T) {
+	var o1, o2 strings.Builder
+	stdout = &o1
+	stderr = &o2
+	if r := runMain([]string{"testdata/t2.go", "-v", "-o", "/dev/null"}); r != 0 {
+		t.Fatalf("Exit code %d: %s", r, o2.String())
+	}
+	// Normally, stderr will have some output b/c we're reverting to etags parsing
+	scanner := bufio.NewScanner(strings.NewReader(o1.String()))
+	matched := false
+	for scanner.Scan() {
+		if strings.Contains(scanner.Text(), "Builtin etags: testdata/t2.go") {
+			matched = true
+			break
+		}
+	}
+	if !matched {
+		t.Fatalf("Did not see verbose output about fallback")
+	}
+}
+
+// Fallback from full parser to external etags b/c not Go.
+func TestFallback2(t *testing.T) {
+	var o1, o2 strings.Builder
+	stdout = &o1
+	stderr = &o2
+	if r := runMain([]string{"testdata/t3.c", "-v", "-o", "/dev/null"}); r != 0 {
+		t.Fatalf("Exit code %d: %s", r, o2.String())
+	}
+	// Normally, stderr will have some output b/c we're reverting to etags parsing
+	scanner := bufio.NewScanner(strings.NewReader(o1.String()))
+	matched := false
+	for scanner.Scan() {
+		if strings.Contains(scanner.Text(), "System etags: testdata/t3.c") {
+			matched = true
+			break
+		}
+	}
+	if !matched {
+		t.Fatalf("Did not see verbose output about fallback")
 	}
 }
