@@ -1,7 +1,7 @@
 # gotags - reliable etags-style tag information for Go
 
-Gotags generates an etags-like tag file for Go source, with better Go awareness
-than etags.
+Gotags generates an etags-like tag file for Go and Python source, with better Go
+and Python awareness than etags.
 
 Input file names are provided on the command line. If the only input file name
 is given as "-" then the names of input files are read from standard input,
@@ -41,9 +41,12 @@ variables, nor types defined inside type lists, nor functions or types with
 type parameters, nor interface or struct members, and it can mistake local type
 declarations for global ones.
 
-For full functionality, gotags requires each Go input file to be syntactically
-well-formed in the sense of "go/parser". If a .go file cannot be parsed,
-gotags prints a warning and falls back to its own etags-style parsing.
+For full Go functionality, gotags requires each Go input file to be
+syntactically well-formed in the sense of "go/parser". If a .go file cannot be
+parsed, gotags prints a warning and falls back to its own etags-style parsing.
+
+Tags are generated for Python function and class definitions. This uses
+etags-style parsing but with better patterns than etags.
 
 Input file names are emitted verbatim in the output, gotags has no resolution of
 relative file names wrt the location of the output file as in etags, nor has it

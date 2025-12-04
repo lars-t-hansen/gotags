@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 /*
-Gotags generates an etags-like tag file for Go source, with better Go awareness than etags.
+Gotags generates an etags-like tag file for Go and Python source, with better Go and Python
+awareness than etags.
 
 Input file names are provided on the command line.  If the only input file name is given as "-" then
 the names of input files are read from standard input, one name per line.
@@ -17,9 +18,12 @@ etags does not handle constants or variables, nor types defined inside type list
 types with type parameters, nor interface or struct members, and it can mistake local type
 declarations for global ones.
 
-For full functionality, gotags requires each Go input file to be syntactically well-formed in the
+For full Go functionality, gotags requires each Go input file to be syntactically well-formed in the
 sense of "go/parser".  If a .go file cannot be parsed, gotags prints a warning and falls back to
 its own etags-style parsing.
+
+Tags are generated for Python function and class definitions.  This uses etags-style parsing but with
+better patterns than etags.
 
 Input file names are emitted verbatim in the output, gotags has no resolution of relative file names
 wrt the location of the output file as in etags, nor has it support for other exotic etags
@@ -214,12 +218,16 @@ func runMain(args []string) int {
 	return computeTags(inputs, output)
 }
 
-var fset = token.NewFileSet()
+var handleByExt = map[string]func(fn, text string, output io.Writer) {
+	".go": handleGo,
+	".py": handlePython,
+}
 
 func computeTags(inputs iter.Seq[string], output io.Writer) int {
 	unhandledFiles := make([]string, 0)
 	for inputFn := range inputs {
-		if path.Ext(inputFn) != ".go" {
+		handler := handleByExt[path.Ext(inputFn)]
+		if handler == nil {
 			unhandledFiles = append(unhandledFiles, inputFn)
 			continue
 		}
@@ -234,15 +242,7 @@ func computeTags(inputs iter.Seq[string], output io.Writer) int {
 		}
 		inputText := string(inputBytes)
 
-		f, err := parser.ParseFile(fset, inputFn, inputText, parser.SkipObjectResolution)
-		if err == nil {
-			goTags(inputFn, inputText, f, output)
-		} else {
-			if !quiet {
-				fmt.Fprintf(stderr, "Reverting to etags parsing for %s: %v\n", inputFn, err)
-			}
-			builtinEtags(inputFn, inputText, output)
-		}
+		handler(inputFn, inputText, output)
 
 		fmt.Fprintf(output, "\x0A")
 	}
@@ -252,7 +252,25 @@ func computeTags(inputs iter.Seq[string], output io.Writer) int {
 	return 0
 }
 
-// Format for goTags-generated and builtinEtags-generated output.
+var fset = token.NewFileSet()
+
+func handleGo(inputFn, inputText string, output io.Writer) {
+	f, err := parser.ParseFile(fset, inputFn, inputText, parser.SkipObjectResolution)
+	if err == nil {
+		goTags(inputFn, inputText, f, output)
+	} else {
+		if !quiet {
+			fmt.Fprintf(stderr, "Reverting to etags parsing for %s: %v\n", inputFn, err)
+		}
+		builtinGoTags(inputFn, inputText, output)
+	}
+}
+
+func handlePython(inputFn, inputText string, output io.Writer) {
+	builtinPyTags(inputFn, inputText, output)
+}
+
+// Format for our output.
 //
 // The full tag file syntax and a fair bit of its semantics are described by etc/ETAGS.EBNF in the
 // Emacs sources.  Gotags generates a file that does not use "include" sections or file properties,
@@ -354,9 +372,9 @@ func makeTag(inputText string, name *ast.Ident, output io.Writer) {
 // IdentCharSet is also used by the testing code.  The intent here is to match Go's syntax though
 // without distinguishing between the initial and subsequent characters.
 
-const identCharSet = `(?:\pL|\pN)`
+const identCharSet = `(?:\pL|\pN|_)`
 
-// EtagsRe is not entirely etags-equivalent.  It requires the keyword to start in column 0, which is
+// GoTagsRe is not entirely etags-equivalent.  It requires the keyword to start in column 0, which is
 // more limiting, but acceptable because that follows standard Go formatting for globals.  On the
 // positive side it also includes var/const definitions found in column 0, won't typically include
 // types defined inside functions, and it handles type parameters.
@@ -364,18 +382,33 @@ const identCharSet = `(?:\pL|\pN)`
 // Like etags, however, it won't find var/const/type definitions inside lists or subsequent
 // var/const in a single definition, and it will be confused by code inside multi-line strings.
 
-var etagsRe = regexp.MustCompile(`^(?:((?:package|func(?:\s*\([^)]+\))?|type|var|const)\s+(` + identCharSet + `+)))`)
+var goTagsRe = regexp.MustCompile(`^(?:((?:package|func(?:\s*\([^)]+\))?|type|var|const)\s+(` + identCharSet + `+)))`)
 
 // Note we have no file offsets.  We could fix that.
 
-func builtinEtags(inputFn, inputText string, output io.Writer) {
+func builtinGoTags(inputFn, inputText string, output io.Writer) {
 	if verbose {
-		fmt.Fprintf(stdout, "Builtin etags: %s\n", inputFn)
+		fmt.Fprintf(stdout, "Builtin gotags: %s\n", inputFn)
 	}
 	lineno := 0
 	for _, l := range strings.Split(inputText, "\n") {
-		if m := etagsRe.FindStringSubmatch(l); m != nil {
+		if m := goTagsRe.FindStringSubmatch(l); m != nil {
 			fmt.Fprintf(output, "\x0A%s\x7F%s\x01%d,", m[1], m[2], lineno+1)
+		}
+		lineno++
+	}
+}
+
+var pyTagsRe = regexp.MustCompile(`^\s*(?:def|async\s+def|class)\s+(` + identCharSet + `+)`)
+
+func builtinPyTags(inputFn, inputText string, output io.Writer) {
+	if verbose {
+		fmt.Fprintf(stdout, "Builtin pytags: %s\n", inputFn)
+	}
+	lineno := 0
+	for _, l := range strings.Split(inputText, "\n") {
+		if m := pyTagsRe.FindStringSubmatch(l); m != nil {
+			fmt.Fprintf(output, "\x0A%s\x7F%s\x01%d,", m[0], m[1], lineno+1)
 		}
 		lineno++
 	}
