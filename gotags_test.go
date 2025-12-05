@@ -21,17 +21,20 @@ var (
 )
 
 // Each .go test file contains Go code and each line that should give rise to a tag has a comment
-// that starts with //D followed by a list of expected tag patterns for that line (with literal
-// tabs if necessary) separated by |, eg "|var v1|var v1, v2|" for a var decl that introduces
-// two names.  The tag names extracted from a pattern are the rightmost comma-separated
-// identifiers.
+// that starts with //D followed by a list of expected tag patterns for that line (with literal tabs
+// if necessary) separated by |, eg "|var v1|var v1, v2|" for a var decl that introduces two names.
+// The tag names extracted from a pattern are the rightmost comma-separated identifiers.
 //
 // Each .py test file contains Python code and the form is the same but the magic starts with "#D".
 //
-// The default assumption is that a file is well-formed Go, but it can switch modes by using a
-// "//builtin-etags" line or a "//native-etags" line ("#builtin-etags" for python).
+// Other test files contain other kinds of code and the form is the same as for the .go files.
 //
-// In this list, order matters: the files to be fed to native etags must come last.
+// The default assumption for .go is that a file is well-formed Go, but it can switch modes by using
+// a "//builtin-etags" line or a "//native-etags" line ("#builtin-etags" for python).
+//
+// In this list, order matters: the files to be fed to native etags must come last.  (That is caused
+// by an issue with the test harness, it weakens testing, we should fix this - the tags program
+// handles interleaved file types and we should test that.)
 
 var testFiles = []string{"testdata/t1.go", "testdata/t2.go", "testdata/t4.py", "testdata/t3.c"}
 
