@@ -94,8 +94,9 @@ var opts = []utils.Option{
 		Handler: utils.SetFlag(&help),
 	},
 	utils.Option{
-		Short:   'o',
-		Help:    fmt.Sprintf("`Filename` of output file, \"-\" for stdout, default \"%s\"", defaultOutname),
+		Short: 'o',
+		Help: fmt.Sprintf(
+			"`Filename` of output file, \"-\" for stdout, default \"%s\"", defaultOutname),
 		Value:   true,
 		Handler: utils.SetString(&outname),
 	},
@@ -120,7 +121,8 @@ var opts = []utils.Option{
 	utils.Option{
 		Long: "etags",
 		Help: fmt.Sprintf(
-			"`Filename` of the native etags program, \"\" to disable this functionality,\n    default \"%s\"",
+			"`Filename` of the native etags program, \"\" to disable this functionality,\n"+
+				"	default \"%s\"",
 			defaultEtags,
 		),
 		Value:   true,
@@ -177,7 +179,10 @@ func runMain(args []string) int {
 	if help {
 		fmt.Fprintf(stdout, "Usage:\n\n")
 		fmt.Fprintf(stdout, "  gotags [options] input-filename ...\n\n")
-		fmt.Fprintf(stdout, "Input-filename can be \"-\" to denote that filenames will be read from stdin.\n\n")
+		fmt.Fprintf(
+			stdout,
+			"Input-filename can be \"-\" to denote that filenames will be read from stdin.\n\n",
+		)
 		fmt.Fprintf(stdout, "Options:\n\n")
 		utils.PrintOpts(stdout, opts)
 		return 0
@@ -218,7 +223,7 @@ func runMain(args []string) int {
 	return computeTags(inputs, output)
 }
 
-var handleByExt = map[string]func(fn, text string, output io.Writer) {
+var handleByExt = map[string]func(fn, text string, output io.Writer){
 	".go": handleGo,
 	".py": handlePython,
 }
@@ -382,7 +387,8 @@ const identCharSet = `(?:\pL|\pN|_)`
 // Like etags, however, it won't find var/const/type definitions inside lists or subsequent
 // var/const in a single definition, and it will be confused by code inside multi-line strings.
 
-var goTagsRe = regexp.MustCompile(`^(?:((?:package|func(?:\s*\([^)]+\))?|type|var|const)\s+(` + identCharSet + `+)))`)
+var goTagsRe = regexp.MustCompile(
+	`^(?:((?:package|func(?:\s*\([^)]+\))?|type|var|const)\s+(` + identCharSet + `+)))`)
 
 // Note we have no file offsets.  We could fix that.
 

@@ -78,11 +78,11 @@ func TestTagging(t *testing.T) {
 			magic = "//" // even for C, for now
 		}
 		for i < len(inLines) {
-			if strings.HasPrefix(inLines[i], magic + "builtin-etags") {
+			if strings.HasPrefix(inLines[i], magic+"builtin-etags") {
 				mode = mBuiltinEtags
-			} else if strings.HasPrefix(inLines[i], magic + "native-etags") {
+			} else if strings.HasPrefix(inLines[i], magic+"native-etags") {
 				mode = mNativeEtags
-			} else if _, after, found := strings.Cut(inLines[i], magic + "D "); found {
+			} else if _, after, found := strings.Cut(inLines[i], magic+"D "); found {
 				patterns := strings.Split(after, "|")
 				if len(patterns) < 3 {
 					t.Fatalf("%s: i=%d: Bad test case: %s", testFile, i, inLines[i])
