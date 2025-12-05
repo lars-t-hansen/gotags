@@ -1,4 +1,4 @@
-# gotags - reliable etags-style tag information for Go
+# gotags - better etags-style tags for Go and Python
 
 Gotags generates an etags-like tag file for Go and Python source, with better Go
 and Python awareness than etags.

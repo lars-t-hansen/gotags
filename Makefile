@@ -5,7 +5,7 @@
 default:
 	@echo "Pick an explicit target"
 
-README.md: gotags Makefile
+README.md: gotags Makefile makedoc.sh
 	./makedoc.sh
 
 gotags: *.go utils/*.go

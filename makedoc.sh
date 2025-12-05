@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "# gotags - reliable etags-style tag information for Go" > README.md
+echo "# gotags - better etags-style tags for Go and Python" > README.md
 echo >> README.md
 go doc | expand -t4 | awk '/^func / { exit } { print }' | \
     while read line; do
