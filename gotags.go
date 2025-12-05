@@ -405,7 +405,12 @@ func builtinGoTags(inputFn, inputText string, output io.Writer) {
 	}
 }
 
-var pyTagsRe = regexp.MustCompile(`^\s*(?:def|async\s+def|class)\s+(` + identCharSet + `+)`)
+var pyTagsRe = regexp.MustCompile(
+	`^(?:` +
+		`(from\s+` + identCharSet + `+\s+import\s+)|` +
+		`(import\s+)` +
+		`\s*(?:def|async\s+def|class)\s+(` + identCharSet + `+)` +
+		`)`)
 
 func builtinPyTags(inputFn, inputText string, output io.Writer) {
 	if verbose {
@@ -414,7 +419,17 @@ func builtinPyTags(inputFn, inputText string, output io.Writer) {
 	lineno := 0
 	for _, l := range strings.Split(inputText, "\n") {
 		if m := pyTagsRe.FindStringSubmatch(l); m != nil {
-			fmt.Fprintf(output, "\x0A%s\x7F%s\x01%d,", m[0], m[1], lineno+1)
+			if m[1] != "" {
+				// from x import y, z, w
+				x := l[len(m[1]):]
+				// comma-separated list of names terminated by "something else"
+			} else if m[2] != "" {
+				// import x, y, z
+				x := l[len(m[2]):]
+				// comma-separated list of names terminated by "something else"
+			} else {
+				fmt.Fprintf(output, "\x0A%s\x7F%s\x01%d,", m[0], m[3], lineno+1)
+			}
 		}
 		lineno++
 	}
