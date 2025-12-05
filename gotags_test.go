@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -19,16 +20,20 @@ var (
 	notInNameAtEnd = regexp.MustCompile(`([\t\f\r (),;=]*)$`)
 )
 
-// Each test file contains Go code and each line that should give rise to a tag has a comment
+// Each .go test file contains Go code and each line that should give rise to a tag has a comment
 // that starts with //D followed by a list of expected tag patterns for that line (with literal
 // tabs if necessary) separated by |, eg "|var v1|var v1, v2|" for a var decl that introduces
 // two names.  The tag names extracted from a pattern are the rightmost comma-separated
 // identifiers.
 //
+// Each .py test file contains Python code and the form is the same but the magic starts with "#D".
+//
 // The default assumption is that a file is well-formed Go, but it can switch modes by using a
-// "//builtin-etags" line or a "//native-etags" line.
+// "//builtin-etags" line or a "//native-etags" line ("#builtin-etags" for python).
+//
+// In this list, order matters: the files to be fed to native etags must come last.
 
-var testFiles = []string{"testdata/t1.go", "testdata/t2.go", "testdata/t3.c"}
+var testFiles = []string{"testdata/t1.go", "testdata/t2.go", "testdata/t4.py", "testdata/t3.c"}
 
 const (
 	mGotags = iota
@@ -62,12 +67,19 @@ func TestTagging(t *testing.T) {
 		i := 0  // Line number
 		ix := 0 // Byte offset of line start
 
+		var magic string
+		switch path.Ext(testFile) {
+		case ".py":
+			magic = "#"
+		default:
+			magic = "//" // even for C, for now
+		}
 		for i < len(inLines) {
-			if strings.HasPrefix(inLines[i], "//builtin-etags") {
+			if strings.HasPrefix(inLines[i], magic + "builtin-etags") {
 				mode = mBuiltinEtags
-			} else if strings.HasPrefix(inLines[i], "//native-etags") {
+			} else if strings.HasPrefix(inLines[i], magic + "native-etags") {
 				mode = mNativeEtags
-			} else if _, after, found := strings.Cut(inLines[i], "//D "); found {
+			} else if _, after, found := strings.Cut(inLines[i], magic + "D "); found {
 				patterns := strings.Split(after, "|")
 				if len(patterns) < 3 {
 					t.Fatalf("%s: i=%d: Bad test case: %s", testFile, i, inLines[i])
@@ -109,6 +121,7 @@ func TestTagging(t *testing.T) {
 							expect = fmt.Sprintf("%s\x7F%d,%d", pattern, lineno, ix)
 						}
 						if got != expect {
+							println(mode)
 							t.Fatalf("%s: i=%d: Got %s but expected %s\n", testFile, i, got, expect)
 						}
 					}
@@ -166,29 +179,33 @@ func TestPipedNames(t *testing.T) {
 	}
 }
 
-// Fallback from full parser to naive built-in parser b/c not well-formed Go.
+// Fallback from full parser to naive built-in parser b/c not well-formed Go, or b/c any Python.
 func TestFallback1(t *testing.T) {
-	var o1, o2 strings.Builder
-	stdout = &o1
-	stderr = &o2
-	if r := runMain([]string{"testdata/t2.go", "-v", "-o", "/dev/null"}); r != 0 {
-		t.Fatalf("Exit code %d: %s", r, o2.String())
-	}
-	// Normally, stderr will have some output b/c we're reverting to etags parsing
-	scanner := bufio.NewScanner(strings.NewReader(o1.String()))
-	matched := false
-	for scanner.Scan() {
-		if strings.Contains(scanner.Text(), "Builtin etags: testdata/t2.go") {
-			matched = true
-			break
+	for _, testFile := range []string{"testdata/t2.go", "testdata/t4.py"} {
+		var o1, o2 strings.Builder
+		stdout = &o1
+		stderr = &o2
+		if r := runMain([]string{testFile, "-v", "-o", "/dev/null"}); r != 0 {
+			t.Fatalf("Exit code %d: %s", r, o2.String())
 		}
-	}
-	if !matched {
-		t.Fatalf("Did not see verbose output about fallback")
+		// Normally, stderr will have some output b/c we're reverting to etags parsing
+
+		scanner := bufio.NewScanner(strings.NewReader(o1.String()))
+		matched := false
+		pat := regexp.MustCompile(`Builtin (?:go|py)tags: ` + testFile)
+		for scanner.Scan() {
+			if pat.MatchString(scanner.Text()) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			t.Fatalf("Did not see verbose output about fallback for " + testFile)
+		}
 	}
 }
 
-// Fallback from full parser to external etags b/c not Go.
+// Fallback from full parser to external etags b/c not Go or Python.
 func TestFallback2(t *testing.T) {
 	var o1, o2 strings.Builder
 	stdout = &o1
