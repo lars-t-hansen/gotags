@@ -3,7 +3,8 @@
 
 #builtin-etags
 
-import zappa
+import zappa, zuppa #D |import zappa|import zappa, zuppa|
+from zupp import zapp, zipp #D |from zupp import zapp|from zupp import zapp, zipp|
 
 def fib(n): #D |def fib|
     if n < 2:

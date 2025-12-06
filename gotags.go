@@ -374,10 +374,10 @@ func makeTag(inputText string, name *ast.Ident, output io.Writer) {
 	fmt.Fprintf(output, "\x0A%s\x7F%s\x01%d,%d", inputText[offs:end], name.Name, line, offs)
 }
 
-// IdentCharSet is also used by the testing code.  The intent here is to match Go's syntax though
-// without distinguishing between the initial and subsequent characters.
+// IdentChars is also used by the testing code.  The intent here is to match Go's and Python's
+// syntax though without distinguishing between the initial and subsequent characters.
 
-const identCharSet = `(?:\pL|\pN|_)`
+const identChars = `(?:\pL|\pN|_)+`
 
 // GoTagsRe is not entirely etags-equivalent.  It requires the keyword to start in column 0, which is
 // more limiting, but acceptable because that follows standard Go formatting for globals.  On the
@@ -388,7 +388,7 @@ const identCharSet = `(?:\pL|\pN|_)`
 // var/const in a single definition, and it will be confused by code inside multi-line strings.
 
 var goTagsRe = regexp.MustCompile(
-	`^(?:((?:package|func(?:\s*\([^)]+\))?|type|var|const)\s+(` + identCharSet + `+)))`)
+	`^(?:((?:package|func(?:\s*\([^)]+\))?|type|var|const)\s+(` + identChars + `)))`)
 
 // Note we have no file offsets.  We could fix that.
 
@@ -405,11 +405,16 @@ func builtinGoTags(inputFn, inputText string, output io.Writer) {
 	}
 }
 
+// TODO: it's possible and indeed typical to have dots in package names:
+//  from fastapi.responses import Response, FileResponse
+//
+// TODO: handle 'as', and how does this interact with the list parsing?
+//  import slurm_monitor.db_operations as db_ops
+
 var pyTagsRe = regexp.MustCompile(
-	`^(?:` +
-		`(from\s+` + identCharSet + `+\s+import\s+)|` +
-		`(import\s+)` +
-		`\s*(?:def|async\s+def|class)\s+(` + identCharSet + `+)` +
+	`^(?:(from\s+` + identChars + `\s+import\s+)|` +
+		`(import\s+)|` +
+		`\s*(?:def|async\s+def|class)\s+(` + identChars + `)` +
 		`)`)
 
 func builtinPyTags(inputFn, inputText string, output io.Writer) {
@@ -419,20 +424,42 @@ func builtinPyTags(inputFn, inputText string, output io.Writer) {
 	lineno := 0
 	for _, l := range strings.Split(inputText, "\n") {
 		if m := pyTagsRe.FindStringSubmatch(l); m != nil {
+			var matches []match
 			if m[1] != "" {
 				// from x import y, z, w
-				x := l[len(m[1]):]
-				// comma-separated list of names terminated by "something else"
+				matches = identList(l, len(m[1]))
 			} else if m[2] != "" {
 				// import x, y, z
-				x := l[len(m[2]):]
-				// comma-separated list of names terminated by "something else"
+				matches = identList(l, len(m[2]))
 			} else {
-				fmt.Fprintf(output, "\x0A%s\x7F%s\x01%d,", m[0], m[3], lineno+1)
+				matches = []match{match{match: m[0], name: m[3]}}
+			}
+			for _, m := range matches {
+				fmt.Fprintf(output, "\x0A%s\x7F%s\x01%d,", m.match, m.name, lineno+1)
 			}
 		}
 		lineno++
 	}
+}
+
+var identRe = regexp.MustCompile(`^\s*,?\s*(` + identChars + `)`)
+
+type match struct {
+	match string
+	name string
+}
+
+func identList(s string, loc int) []match {
+	ss := make([]match, 0)
+	for {
+		m := identRe.FindStringSubmatch(s[loc:])
+		if m == nil {
+			break
+		}
+		loc = loc + len(m[0])
+		ss = append(ss, match{match: s[:loc], name: m[1]})
+	}
+	return ss
 }
 
 func systemEtags(names []string, output io.Writer) int {

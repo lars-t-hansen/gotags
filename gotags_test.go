@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	idAtEnd        = regexp.MustCompile(`(` + identCharSet + `+)$`)
+	idAtEnd        = regexp.MustCompile(`(` + identChars + `)$`)
 	commaAtEnd     = regexp.MustCompile(`(,\s*)$`)
 	notInNameAtEnd = regexp.MustCompile(`([\t\f\r (),;=]*)$`)
 )
