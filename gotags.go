@@ -410,6 +410,9 @@ func builtinGoTags(inputFn, inputText string, output io.Writer) {
 //
 // TODO: handle 'as', and how does this interact with the list parsing?
 //  import slurm_monitor.db_operations as db_ops
+//
+// Here's the full grammar:
+//  https://docs.python.org/3/reference/simple_stmts.html#import
 
 var pyTagsRe = regexp.MustCompile(
 	`^(?:(from\s+` + identChars + `\s+import\s+)|` +
