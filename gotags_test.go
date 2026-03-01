@@ -93,7 +93,7 @@ func TestTagging(t *testing.T) {
 					if m := notInNameAtEnd.FindStringSubmatch(srch); m != nil {
 						srch = srch[:len(srch)-len(m[1])]
 					}
-					tagnames := make([]string, 0)
+					var tagnames []string
 					for {
 						m := idAtEnd.FindStringSubmatch(srch)
 						if m == nil {

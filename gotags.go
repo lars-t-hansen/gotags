@@ -81,7 +81,7 @@ func clearOptions() {
 	verbose = false
 	version = false
 	help = false
-	inputFilenames = make([]string, 0)
+	inputFilenames = nil
 	namesFromStdin = false
 	members = defaultMembers
 }
@@ -229,7 +229,7 @@ var handleByExt = map[string]func(fn, text string, output io.Writer){
 }
 
 func computeTags(inputs iter.Seq[string], output io.Writer) int {
-	unhandledFiles := make([]string, 0)
+	var unhandledFiles []string
 	for inputFn := range inputs {
 		handler := handleByExt[path.Ext(inputFn)]
 		if handler == nil {
@@ -453,7 +453,7 @@ type match struct {
 }
 
 func identList(s string, loc int) []match {
-	ss := make([]match, 0)
+	var ss []match
 	for {
 		m := identRe.FindStringSubmatch(s[loc:])
 		if m == nil {
